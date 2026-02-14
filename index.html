@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Cordis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: {
+              cordis: {
+                accent: '#6366f1',
+                accentHover: '#4f46e5',
+                danger: '#ef4444',
+                success: '#10b981'
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Theme Engine */
+      :root[data-theme='dark'] {
+        --bg-0: #0f111a; --bg-1: #151821; --bg-2: #1e212e; --bg-3: #2a2e3f;
+        --text-main: #f8fafc; --text-muted: #94a3b8; --border: rgba(255,255,255,0.08);
+      }
+      :root[data-theme='amoled'] {
+        --bg-0: #000000; --bg-1: #080808; --bg-2: #121212; --bg-3: #1a1a1a;
+        --text-main: #ffffff; --text-muted: #64748b; --border: rgba(255,255,255,0.05);
+      }
+      :root[data-theme='light'] {
+        --bg-0: #f1f5f9; --bg-1: #ffffff; --bg-2: #e2e8f0; --bg-3: #cbd5e1;
+        --text-main: #0f172a; --text-muted: #64748b; --border: rgba(0,0,0,0.08);
+      }
+
+      body { 
+        background-color: var(--bg-0); 
+        color: var(--text-main);
+        transition: all 0.2s ease;
+      }
+      
+      .bg-v0 { background-color: var(--bg-0); }
+      .bg-v1 { background-color: var(--bg-1); }
+      .bg-v2 { background-color: var(--bg-2); }
+      .bg-v3 { background-color: var(--bg-3); }
+      .border-v { border-color: var(--border); }
+      .text-v-main { color: var(--text-main); }
+      .text-v-muted { color: var(--text-muted); }
+
+      ::-webkit-scrollbar { width: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 10px; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0"
+  }
+}
+</script>
+</head>
+  <body class="overflow-hidden select-none">
+    <div id="root"></div>
+  </body>
+</html>

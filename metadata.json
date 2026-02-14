@@ -1,0 +1,9 @@
+{
+  "name": "Cordis - Communication Platform",
+  "description": "A fully functional Discord-inspired communication platform featuring server management, real-time text chat simulation, voice/video channel UI, and AI-powered assistant integration.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "display-capture"
+  ]
+}
