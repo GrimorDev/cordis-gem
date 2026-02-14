@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Bell, Users, Settings, MessageSquare, Search } from 'lucide-react';
+import { Sparkles, Bell, Users, Settings, MessageSquare, Search, UserPlus } from 'lucide-react';
 import { ServerList } from './components/ServerList';
 import { ChannelList } from './components/ChannelList';
 import { ChatArea } from './components/ChatArea';
@@ -220,6 +220,10 @@ const App: React.FC = () => {
         settings: { ...currentUser.settings, ...data.settings }
       };
       setCurrentUser(updatedUser);
+    } else if (modalType === 'ADD_FRIEND') {
+        const friendId = data.friendId;
+        // Mocking friend addition
+        setCurrentUser(prev => ({ ...prev, friends: [...(prev.friends || []), friendId] }));
     } else if (modalType === 'SERVER_SETTINGS') {
       if (data._action === 'DELETE_SERVER') {
         try {
@@ -311,33 +315,36 @@ const App: React.FC = () => {
     setModalData(data);
   };
 
-  const startCall = async (channelId: string) => {
+  const startCall = async (channelId: string, isVideo: boolean = false) => {
     if (activeVoiceChannelId === channelId) return;
     
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isCameraOn });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo || isCameraOn });
         setLocalStream(stream);
+        setIsCameraOn(isVideo);
         setActiveVoiceChannelId(channelId);
         setIsVoiceMinimized(false);
 
-        setServers(prev => prev.map(s => {
-            if (s.id !== activeServerId) return s;
-            return {
-                ...s,
-                categories: s.categories.map(c => ({
-                    ...c,
-                    channels: c.channels.map(ch => {
-                        if (ch.id === channelId) {
-                            return { ...ch, connectedUserIds: Array.from(new Set([...ch.connectedUserIds, currentUser.id, GEMINI_BOT.id])) };
-                        }
-                        if (ch.type === ChannelType.VOICE) {
-                            return { ...ch, connectedUserIds: ch.connectedUserIds.filter(id => id !== currentUser.id) };
-                        }
-                        return ch;
-                    })
-                }))
-            };
-        }));
+        if (activeServerId !== 'DM') {
+          setServers(prev => prev.map(s => {
+              if (s.id !== activeServerId) return s;
+              return {
+                  ...s,
+                  categories: s.categories.map(c => ({
+                      ...c,
+                      channels: c.channels.map(ch => {
+                          if (ch.id === channelId) {
+                              return { ...ch, connectedUserIds: Array.from(new Set([...ch.connectedUserIds, currentUser.id, GEMINI_BOT.id])) };
+                          }
+                          if (ch.type === ChannelType.VOICE) {
+                              return { ...ch, connectedUserIds: ch.connectedUserIds.filter(id => id !== currentUser.id) };
+                          }
+                          return ch;
+                      })
+                  }))
+              };
+          }));
+        }
     } catch (err) {
         console.error("Call error:", err);
         setActiveVoiceChannelId(channelId);
@@ -374,7 +381,7 @@ const App: React.FC = () => {
     setActiveVoiceChannelId(null);
     setIsVoiceMinimized(false);
 
-    if (prevVoiceId) {
+    if (prevVoiceId && activeServerId !== 'DM') {
         setServers(prev => prev.map(s => ({
             ...s,
             categories: s.categories.map(c => ({
@@ -411,7 +418,7 @@ const App: React.FC = () => {
         <aside className="w-[280px] flex flex-col bg-v1 border-r border-v shrink-0">
           {activeServerId === 'DM' ? (
             <div className="flex-1 flex flex-col h-full bg-[#080808]">
-                <div className="p-4 border-b border-white/5">
+                <div className="p-4 border-b border-white/5 space-y-2">
                     <div className="relative">
                         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                         <input 
@@ -419,6 +426,12 @@ const App: React.FC = () => {
                             className="w-full bg-v2 p-2 pl-9 rounded-lg text-[11px] font-bold text-slate-300 placeholder:text-slate-600 outline-none focus:border-indigo-500/30 border border-transparent transition-all"
                         />
                     </div>
+                    <button 
+                      onClick={() => openModal('ADD_FRIEND')}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600/20 text-[11px] font-black uppercase tracking-wider transition-all"
+                    >
+                      <UserPlus size={14} /> Dodaj znajomego
+                    </button>
                 </div>
                 <div className="p-3 space-y-1 flex-1 overflow-y-auto no-scrollbar">
                     <div className="px-3 py-2 text-[10px] font-black text-v-muted uppercase tracking-[0.2em] opacity-60">Prywatne wiadomości</div>
@@ -443,7 +456,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-[12px] font-black text-white truncate tracking-tight">{currentUser.username}</p>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest opacity-60">Dostępny</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest opacity-60">#{currentUser.discriminator}</p>
                     </div>
                     <button onClick={() => openModal('SETTINGS')} className="p-1.5 hover:bg-white/5 text-v-muted hover:text-white rounded-lg"><Settings size={16}/></button>
                 </div>
@@ -489,6 +502,20 @@ const App: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-4">
+               {activeServerId === 'DM' && activeDMUser && (
+                 <div className="flex items-center gap-2 mr-2">
+                    <button onClick={() => startCall(activeChannelId || '', false)} className="p-2 text-v-muted hover:text-emerald-500 transition-colors"><Bell size={20}/></button>
+                    <button onClick={() => startCall(activeChannelId || '', true)} className="p-2 text-v-muted hover:text-indigo-500 transition-colors"><Sparkles size={20}/></button>
+                 </div>
+               )}
+               {activeServerId !== 'DM' && (
+                 <button 
+                  onClick={() => openModal('INVITE', activeServer)}
+                  className="px-3 py-1.5 bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20"
+                 >
+                   Zaproś
+                 </button>
+               )}
                {activeServerId !== 'DM' && <button onClick={() => openModal('SERVER_SETTINGS')} className="p-2 text-v-muted hover:text-white hover:bg-v2 rounded-lg transition-all"><Settings size={18}/></button>}
                <button className="p-2 text-v-muted hover:text-white"><Bell size={18}/></button>
                <button className="p-2 text-v-muted hover:text-white"><Users size={18}/></button>
@@ -516,7 +543,7 @@ const App: React.FC = () => {
                 )}
             </main>
             {activeServerId === 'DM' ? (
-              activeDMUser && <UserProfileSidebar user={activeDMUser as User} />
+              activeDMUser && <UserProfileSidebar user={activeDMUser as User} onCall={() => startCall(activeChannelId || '', false)} onVideoCall={() => startCall(activeChannelId || '', true)} />
             ) : (
               <aside className="w-[280px] border-l border-v bg-v1 shrink-0 hidden xl:block">
                 <UserList members={activeServer?.members || []} server={activeServer} />
@@ -528,7 +555,7 @@ const App: React.FC = () => {
             isVoiceMinimized ? (
               <MiniPlayer 
                 stream={localStream} 
-                channelName={activeServer?.categories?.flatMap(c => c.channels).find(ch => ch.id === activeVoiceChannelId)?.name}
+                channelName={activeServerId === 'DM' ? activeChannel?.name : activeServer?.categories?.flatMap(c => c.channels).find(ch => ch.id === activeVoiceChannelId)?.name}
                 isMicMuted={isMicMuted}
                 isDeafened={isDeafened}
                 onExpand={() => setIsVoiceMinimized(false)}

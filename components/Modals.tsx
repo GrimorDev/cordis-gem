@@ -1,12 +1,11 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  X, Shield, Users, Edit3, Plus, Check, ChevronRight, 
-  Ban, UserMinus, Settings, Bell, Upload, Mic, Video, VideoOff,
-  Lock, Eye, Palette, Monitor, LogOut, Trash2, Volume2, Globe, Speaker, Hash, Layers, Sliders, Trash, Search, ChevronLeft, AlertCircle, Play, Music, FolderPlus
+  X, Shield, Users, Plus, Check, ChevronRight, 
+  Ban, UserMinus, Settings, Bell, Upload, Video, VideoOff,
+  Lock, Palette, Monitor, LogOut, Trash2, Volume2, Globe, Hash, Layers, Sliders, Trash, ChevronLeft, AlertCircle, Play, Music, UserPlus
 } from 'lucide-react';
-import { ModalType, ChannelType, User, Server, Theme, Language, Channel, Role, Permission } from '../types';
-import { fileToBase64 } from '../utils/helpers';
+import { ModalType, ChannelType, User, Server, Theme, Channel, Role, Permission } from '../types';
+import { fileToBase64, getUserRoleColor } from '../utils/helpers';
 import { useAudioLevel } from './VideoGrid';
 
 interface ModalProps {
@@ -52,6 +51,78 @@ export const ModalManager: React.FC<ModalProps> = ({ isOpen, type, onClose, onSu
                 {type === 'CREATE_CATEGORY' && <CreateCategoryModal onClose={onClose} onSubmit={onSubmit} />}
                 {type === 'EDIT_CHANNEL' && targetData && <EditChannelModal onClose={onClose} onSubmit={onSubmit} channel={targetData} activeServer={activeServer} />}
                 {type === 'DEVICE_SETTINGS' && <DeviceSettingsModal onClose={onClose} />}
+                {type === 'ADD_FRIEND' && <AddFriendModal onClose={onClose} onSubmit={onSubmit} />}
+                {type === 'INVITE' && <InviteModal onClose={onClose} server={targetData} />}
+            </div>
+        </div>
+    );
+};
+
+const AddFriendModal = ({ onClose, onSubmit }: any) => {
+    const [id, setId] = useState('');
+    return (
+        <div className="p-8 bg-v1">
+            <h2 className="text-2xl font-bold text-white mb-2">Dodaj znajomego</h2>
+            <p className="text-slate-400 text-sm mb-6">Możesz dodać znajomego, wpisując jego identyfikator Cordis (np. <span className="text-white font-mono">użytkownik#2403</span>).</p>
+            <div className="space-y-2 mb-8 text-left">
+                <input 
+                    value={id} 
+                    onChange={e => setId(e.target.value)} 
+                    className="w-full bg-[#1e1f22] p-4 rounded-xl text-white font-medium outline-none border border-white/5 focus:border-indigo-500/50 transition-all" 
+                    placeholder="Wprowadź ID użytkownika..." 
+                    autoFocus
+                />
+            </div>
+            <div className="flex justify-end items-center bg-v2 -mx-8 -mb-8 p-4 gap-4">
+                <button onClick={onClose} className="text-white text-sm font-bold hover:underline">Anuluj</button>
+                <button 
+                    onClick={() => id.trim() && onSubmit({ friendId: id })} 
+                    className="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold text-sm hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20"
+                >
+                    Wyślij zaproszenie
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const InviteModal = ({ onClose, server }: { onClose: () => void, server: Server }) => {
+    const inviteCode = `cordis.gg/${server.name.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substr(2, 5)}`;
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(inviteCode);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <div className="p-8 bg-v1">
+            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                <Users size={20} className="text-indigo-400" /> Zaproś znajomych do {server.name}
+            </h2>
+            <p className="text-slate-400 text-sm mb-6">Udostępnij ten link innym, aby mogli dołączyć do Twojego serwera.</p>
+            
+            <div className="space-y-4">
+                <div className="relative">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">Link zaproszenia</label>
+                    <div className="flex gap-2">
+                        <div className="flex-1 bg-[#1e1f22] p-3 rounded-xl text-indigo-400 font-bold text-sm border border-white/5 truncate">
+                            {inviteCode}
+                        </div>
+                        <button 
+                            onClick={handleCopy}
+                            className={`px-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${copied ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
+                        >
+                            {copied ? <Check size={18}/> : 'Kopiuj'}
+                        </button>
+                    </div>
+                </div>
+                <p className="text-[10px] text-slate-500 italic">Ten link wygaśnie za 7 dni i ma nieograniczoną liczbę użyć.</p>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-white/5 flex justify-end">
+                <button onClick={onClose} className="bg-white/5 hover:bg-white/10 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">Zamknij</button>
             </div>
         </div>
     );

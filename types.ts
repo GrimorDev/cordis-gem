@@ -82,6 +82,7 @@ export interface User {
   isBot?: boolean;
   roleIds?: string[];
   settings: UserSettings;
+  friends?: string[]; // IDs of friends
 }
 
 export interface Message {
@@ -128,9 +129,18 @@ export interface Server {
   members: User[];
   ownerId: string;
   roles: Role[];
+  invites?: ServerInvite[];
   notificationSettings?: {
     mode: 'ALL' | 'MENTIONS' | 'NONE';
   };
+}
+
+export interface ServerInvite {
+  code: string;
+  creatorId: string;
+  expiresAt?: Date;
+  uses: number;
+  maxUses?: number;
 }
 
 export type ModalType = 
@@ -144,4 +154,5 @@ export type ModalType =
   | 'DELETE_SERVER' 
   | 'DEVICE_SETTINGS' 
   | 'NOTIFICATION_SETTINGS'
+  | 'ADD_FRIEND'
   | null;

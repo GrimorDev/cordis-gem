@@ -1,12 +1,15 @@
+
 import React, { useState } from 'react';
 import { User, UserStatus } from '../types';
 import { ChevronRight, Phone, Video, MoreHorizontal, ShieldCheck } from 'lucide-react';
 
 interface UserProfileSidebarProps {
   user: User;
+  onCall?: () => void;
+  onVideoCall?: () => void;
 }
 
-export const UserProfileSidebar: React.FC<UserProfileSidebarProps> = ({ user }) => {
+export const UserProfileSidebar: React.FC<UserProfileSidebarProps> = ({ user, onCall, onVideoCall }) => {
   const [note, setNote] = useState('');
 
   const getStatusColor = (status: UserStatus) => {
@@ -44,10 +47,16 @@ export const UserProfileSidebar: React.FC<UserProfileSidebarProps> = ({ user }) 
 
       {/* Action Buttons */}
       <div className="mt-12 px-4 flex gap-2">
-         <button className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-black transition-all shadow-lg shadow-indigo-600/20">
+         <button 
+          onClick={onCall}
+          className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-lg text-xs font-black transition-all shadow-lg shadow-indigo-600/20"
+         >
             <Phone size={14} fill="currentColor" /> Zadzwoń
          </button>
-         <button className="flex-1 flex items-center justify-center gap-2 bg-v2 hover:bg-v3 text-white py-2 rounded-lg text-xs font-black transition-all border border-white/5">
+         <button 
+          onClick={onVideoCall}
+          className="flex-1 flex items-center justify-center gap-2 bg-v2 hover:bg-v3 text-white py-2 rounded-lg text-xs font-black transition-all border border-white/5"
+         >
             <Video size={14} fill="currentColor" /> Wideo
          </button>
          <button className="p-2 bg-v2 hover:bg-v3 text-v-muted rounded-lg border border-white/5">
