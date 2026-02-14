@@ -14,18 +14,9 @@ import { INITIAL_SERVERS, MOCK_USER, GEMINI_BOT } from './constants';
 import { generateAIResponse } from './services/geminiService';
 
 const App: React.FC = () => {
-  const [servers, setServers] = useState<Server[]>(() => {
-    const saved = localStorage.getItem('cordis_servers');
-    return saved ? JSON.parse(saved) : INITIAL_SERVERS;
-  });
-  const [currentUser, setCurrentUser] = useState<User>(() => {
-    const saved = localStorage.getItem('cordis_user');
-    return saved ? JSON.parse(saved) : MOCK_USER;
-  });
-  const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>(() => {
-    const saved = localStorage.getItem('cordis_messages');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [servers, setServers] = useState<Server[]>(INITIAL_SERVERS);
+  const [currentUser, setCurrentUser] = useState<User>(MOCK_USER);
+  const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({});
 
   const [activeServerId, setActiveServerId] = useState<string | 'DM'>(servers[0]?.id || 'DM');
   const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
@@ -41,18 +32,62 @@ const App: React.FC = () => {
   const [isDeafened, setIsDeafened] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
 
+  // Inicjalizacja danych z API z obsługą błędów i weryfikacją statusu
+  useEffect(() => {
+    const fetchData = async () => {
+        try {
+            const serversRes = await fetch('/api/servers');
+            if (!serversRes.ok) throw new Error(`HTTP error! status: ${serversRes.status}`);
+            
+            const serversData = await serversRes.json();
+            if (Array.isArray(serversData) && serversData.length > 0) {
+                const mappedServers = serversData.map((s: any) => ({
+                    ...s,
+                    ownerId: s.owner_id,
+                    roles: typeof s.roles === 'string' ? JSON.parse(s.roles) : s.roles,
+                    categories: typeof s.categories === 'string' ? JSON.parse(s.categories) : s.categories
+                }));
+                setServers(mappedServers);
+            }
+        } catch (e) {
+            console.warn("Fetch servers error - using local INITIAL_SERVERS", e);
+        }
+    };
+    fetchData();
+  }, []);
+
+  // Pobieranie wiadomości przy zmianie kanału
+  useEffect(() => {
+    if (activeChannelId && activeChannelId !== 'dm-gemini' && !messagesMap[activeChannelId]) {
+        const fetchMessages = async () => {
+            try {
+                const res = await fetch(`/api/messages/${activeChannelId}`);
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    const mapped = data.map((m: any) => ({
+                        ...m,
+                        senderId: m.sender_id,
+                        channelId: m.channel_id,
+                        replyToId: m.reply_to_id,
+                        isDeleted: m.is_deleted,
+                        isEdited: m.is_edited,
+                        timestamp: new Date(m.timestamp)
+                    }));
+                    setMessagesMap(prev => ({ ...prev, [activeChannelId]: mapped }));
+                }
+            } catch (e) {
+                console.warn("Messages fetch error", e);
+            }
+        };
+        fetchMessages();
+    }
+  }, [activeChannelId]);
+
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', currentUser.settings.theme);
-    localStorage.setItem('cordis_user', JSON.stringify(currentUser));
   }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem('cordis_messages', JSON.stringify(messagesMap));
-  }, [messagesMap]);
-
-  useEffect(() => {
-    localStorage.setItem('cordis_servers', JSON.stringify(servers));
-  }, [servers]);
 
   // Set initial channel on load if not set
   useEffect(() => {
@@ -63,7 +98,7 @@ const App: React.FC = () => {
     } else if (!activeChannelId && activeServerId === 'DM') {
       setActiveChannelId('dm-gemini');
     }
-  }, []);
+  }, [servers, activeServerId]);
 
   const activeServer = servers.find(s => s.id === activeServerId);
   
@@ -77,6 +112,18 @@ const App: React.FC = () => {
     : activeServer?.categories?.flatMap(c => c.channels).find(c => c.id === activeChannelId);
 
   const activeDMUser = activeServerId === 'DM' ? dmChannels.find(d => d.id === activeChannelId)?.user : null;
+
+  const syncServer = async (server: Server) => {
+    try {
+        await fetch('/api/servers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(server)
+        });
+    } catch (e) {
+        console.error("Sync server failed", e);
+    }
+  };
 
   const handleSendMessage = async (content: string, replyToId?: string, attachment?: any) => {
     if (!activeChannelId) return;
@@ -93,12 +140,28 @@ const App: React.FC = () => {
         ...prev, 
         [activeChannelId]: [...(prev[activeChannelId] || []), newMessage] 
     }));
+
+    // Save to DB
+    try {
+        await fetch('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ...newMessage,
+                channel_id: activeChannelId,
+                sender_id: currentUser.id,
+                reply_to_id: replyToId
+            })
+        });
+    } catch (e) {
+        console.error("Save message failed", e);
+    }
     
     if (activeChannelId === 'dm-gemini' || content.toLowerCase().includes('gemini')) {
       setTypingUsers([GEMINI_BOT.username]);
       const response = await generateAIResponse(content);
       
-      setTimeout(() => {
+      setTimeout(async () => {
         setTypingUsers([]);
         const aiMsg: Message = { 
             id: (Date.now()+1).toString(), 
@@ -108,6 +171,22 @@ const App: React.FC = () => {
             replyToId: newMessage.id
         };
         setMessagesMap(prev => ({ ...prev, [activeChannelId]: [...(prev[activeChannelId] || []), aiMsg] }));
+        
+        // Save AI msg to DB
+        try {
+            await fetch('/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...aiMsg,
+                    channel_id: activeChannelId,
+                    sender_id: GEMINI_BOT.id,
+                    reply_to_id: newMessage.id
+                })
+            });
+        } catch (e) {
+            console.error("Save AI message failed", e);
+        }
       }, 1500);
     }
   };
@@ -130,7 +209,7 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleModalSubmit = (data: any) => {
+  const handleModalSubmit = async (data: any) => {
     let shouldClose = true;
 
     if (modalType === 'SETTINGS') {
@@ -140,25 +219,27 @@ const App: React.FC = () => {
         avatar: data.avatar || currentUser.avatar,
         settings: { ...currentUser.settings, ...data.settings }
       };
-      
       setCurrentUser(updatedUser);
-      setServers(prev => prev.map(s => ({
-        ...s,
-        members: s.members.map(m => m.id === updatedUser.id ? updatedUser : m)
-      })));
     } else if (modalType === 'SERVER_SETTINGS') {
       if (data._action === 'DELETE_SERVER') {
-        const remainingServers = servers.filter(s => s.id !== data.id);
-        setServers(remainingServers);
-        setActiveServerId('DM');
-        setActiveChannelId('dm-gemini');
+        try {
+            await fetch(`/api/servers/${data.id}`, { method: 'DELETE' });
+            const remainingServers = servers.filter(s => s.id !== data.id);
+            setServers(remainingServers);
+            setActiveServerId('DM');
+            setActiveChannelId('dm-gemini');
+        } catch (e) {
+            console.error("Delete server failed", e);
+        }
         shouldClose = true;
       } else {
         setServers(prev => prev.map(s => s.id === data.id ? data : s));
+        await syncServer(data);
         shouldClose = false; 
       }
     } else if (modalType === 'EDIT_CHANNEL') {
       setServers(prev => prev.map(s => s.id === activeServerId ? data : s));
+      await syncServer(data);
     } else if (modalType === 'CREATE_SERVER') {
       const newServerId = 's-' + Date.now();
       const newServer: Server = {
@@ -170,7 +251,9 @@ const App: React.FC = () => {
         roles: [...INITIAL_SERVERS[0].roles],
         categories: [{ id: 'c-gen-' + Date.now(), name: 'General', channels: [{ id: 'ch-' + Date.now(), name: 'ogolny', type: ChannelType.TEXT, messages: [], connectedUserIds: [], categoryId: 'c-gen' }] }]
       };
-      setServers([...servers, newServer]);
+      const newServersList = [...servers, newServer];
+      setServers(newServersList);
+      await syncServer(newServer);
       setActiveServerId(newServerId);
       setActiveChannelId(newServer.categories[0].channels[0].id);
     } else if (modalType === 'CREATE_CATEGORY') {
@@ -179,13 +262,15 @@ const App: React.FC = () => {
             name: data.name,
             channels: []
         };
-        setServers(prev => prev.map(s => {
-            if (s.id !== activeServerId) return s;
-            return {
-                ...s,
-                categories: [...s.categories, newCat]
-            };
-        }));
+        setServers(prev => {
+            const list = prev.map(s => {
+                if (s.id !== activeServerId) return s;
+                const updated = { ...s, categories: [...s.categories, newCat] };
+                syncServer(updated);
+                return updated;
+            });
+            return list;
+        });
     } else if (modalType === 'CREATE_CHANNEL') {
         const newCh: Channel = {
             id: 'ch-' + Date.now(),
@@ -195,16 +280,21 @@ const App: React.FC = () => {
             connectedUserIds: [],
             categoryId: data.categoryId
         };
-        setServers(prev => prev.map(s => {
-            if (s.id !== activeServerId) return s;
-            return {
-                ...s,
-                categories: s.categories.map(cat => {
-                    if (cat.id !== data.categoryId) return cat;
-                    return { ...cat, channels: [...cat.channels, newCh] };
-                })
-            };
-        }));
+        setServers(prev => {
+            const list = prev.map(s => {
+                if (s.id !== activeServerId) return s;
+                const updated = {
+                    ...s,
+                    categories: s.categories.map(cat => {
+                        if (cat.id !== data.categoryId) return cat;
+                        return { ...cat, channels: [...cat.channels, newCh] };
+                    })
+                };
+                syncServer(updated);
+                return updated;
+            });
+            return list;
+        });
         if (data.type === ChannelType.TEXT) {
             setActiveChannelId(newCh.id);
         }
