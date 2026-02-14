@@ -1,4 +1,3 @@
-
 const express = require('express');
 const { Pool } = require('pg');
 const path = require('path');
@@ -21,6 +20,14 @@ pool.on('error', (err) => {
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// Middleware do poprawnego serwowania plików TSX jako module JS dla przeglądarki
+app.use((req, res, next) => {
+  if (req.path.endsWith('.tsx') || req.path.endsWith('.ts')) {
+    res.type('application/javascript');
+  }
+  next();
+});
 
 // --- API Użytkownicy ---
 app.get('/api/users/:id', async (req, res) => {

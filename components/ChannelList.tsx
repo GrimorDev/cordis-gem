@@ -5,17 +5,6 @@ import { Server, ChannelType, User, UserStatus, ModalType } from '../types';
 import { useAudioLevel } from './VideoGrid';
 import { getUserRoleColor } from '../utils/helpers';
 
-interface ChannelListProps {
-  activeServer?: Server;
-  activeChannelId: string | null;
-  activeVoiceChannelId: string | null;
-  currentUser: User;
-  onSelectChannel: (id: string) => void;
-  onCreateChannel: (catId: string) => void;
-  onOpenSettings: (type: ModalType, data?: any) => void;
-  onStatusChange?: (status: UserStatus) => void;
-}
-
 const VoiceParticipant: React.FC<{ user: User; server?: Server; isLocal: boolean; isTalking: boolean }> = ({ user, server, isLocal, isTalking }) => {
   const roleColor = getUserRoleColor(user, server);
   
@@ -86,7 +75,8 @@ export const ChannelList: React.FC<ChannelListProps> = ({
   
   if (!activeServer) return null;
 
-  const localLevel = useAudioLevel(null, false);
+  // Passing all arguments to useAudioLevel to avoid potential inference issues
+  const localLevel = useAudioLevel(null, false, false);
   const isLocalTalking = localLevel > 20;
 
   const getStatusColor = (status: UserStatus) => {
@@ -171,12 +161,14 @@ export const ChannelList: React.FC<ChannelListProps> = ({
                     <div key={cat.id} className="mb-6">
                         <div className="flex items-center justify-between mb-2 px-3">
                             <span className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] truncate">{cat.name}</span>
-                            <Plus 
-                                size={14} 
-                                className="text-slate-700 hover:text-white cursor-pointer transition-colors" 
+                            {/* Fixed title prop error by wrapping Plus icon in a button */}
+                            <button 
                                 onClick={() => onCreateChannel(cat.id)} 
+                                className="text-slate-700 hover:text-white transition-colors p-1"
                                 title="Utwórz kanał"
-                            />
+                            >
+                                <Plus size={14} />
+                            </button>
                         </div>
                         <div className="space-y-0.5">
                             {cat.channels.map(ch => {
@@ -306,3 +298,14 @@ export const ChannelList: React.FC<ChannelListProps> = ({
     </div>
   );
 };
+
+interface ChannelListProps {
+  activeServer?: Server;
+  activeChannelId: string | null;
+  activeVoiceChannelId: string | null;
+  currentUser: User;
+  onSelectChannel: (id: string) => void;
+  onCreateChannel: (catId: string) => void;
+  onOpenSettings: (type: ModalType, data?: any) => void;
+  onStatusChange?: (status: UserStatus) => void;
+}

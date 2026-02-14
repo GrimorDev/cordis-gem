@@ -20,7 +20,8 @@ interface VideoGridProps {
 // Hook to detect audio levels from a MediaStream
 export const useAudioLevel = (stream: MediaStream | null, isMuted: boolean, isDeafened: boolean = false) => {
     const [level, setLevel] = useState(0);
-    const requestRef = useRef<number>();
+    // Providing initial value to useRef to satisfy strict TypeScript checks
+    const requestRef = useRef<number>(0);
     const analyserRef = useRef<AnalyserNode | null>(null);
 
     useEffect(() => {
