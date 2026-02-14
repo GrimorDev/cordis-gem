@@ -1,5 +1,6 @@
+
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, User, Monitor, MonitorOff, PhoneOff, Video, VideoOff, Headphones, HeadphoneOff, Volume2, Volume1, VolumeX, Settings, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+import { Mic, MicOff, User, Monitor, MonitorOff, PhoneOff, Video, VideoOff, Headphones, HeadphoneOff, Volume2, Volume1, VolumeX, Settings, ChevronDown, Maximize2, Minimize2, X } from 'lucide-react';
 
 interface VideoGridProps {
     localStream: MediaStream | null;
@@ -138,14 +139,23 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
             {/* Content Area */}
             <div className={`flex-1 flex flex-col gap-3 w-full max-w-[1400px] mx-auto items-center overflow-hidden transition-all duration-500`}>
                 
-                {/* Screen Share Section - Now MUCH LARGER */}
+                {/* Screen Share Section */}
                 {hasScreenShare && (
-                     <div className="relative flex-[4] w-full bg-black rounded-[2.5rem] overflow-hidden shadow-2xl border border-indigo-500/20 group ring-1 ring-white/5">
+                     <div className="relative flex-[4] w-full bg-black rounded-[2rem] overflow-hidden shadow-2xl border border-indigo-500/40 group ring-1 ring-white/5">
                         <video ref={screenVideoRef} autoPlay playsInline muted className="w-full h-full object-contain" />
                         
                         {/* Overlay Information */}
-                        <div className="absolute top-6 left-6 bg-indigo-600/90 backdrop-blur px-4 py-2 rounded-xl text-white text-[10px] font-black flex items-center shadow-lg z-10 uppercase tracking-[0.2em] ring-1 ring-white/20">
-                            <Monitor size={14} className="mr-2" /> Udostępniasz ekran
+                        <div className="absolute top-6 left-6 flex items-center gap-2 z-10">
+                            <div className="bg-emerald-500/90 backdrop-blur px-4 py-2 rounded-xl text-white text-[10px] font-black flex items-center shadow-lg uppercase tracking-[0.2em] ring-1 ring-white/20">
+                                <Monitor size={14} className="mr-2" /> Udostępniasz ekran
+                            </div>
+                            <button 
+                                onClick={onToggleScreenShare}
+                                className="bg-rose-600/90 hover:bg-rose-500 backdrop-blur p-2 rounded-xl text-white shadow-lg ring-1 ring-white/20 transition-all"
+                                title="Zatrzymaj udostępnianie"
+                            >
+                                <X size={14} />
+                            </button>
                         </div>
 
                         {/* Fullscreen Button */}
@@ -158,7 +168,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
                     </div>
                 )}
 
-                {/* Participant Row - Small & Underneath */}
+                {/* Participant Row */}
                 <div className={`flex items-center justify-center gap-3 w-full px-2 ${hasScreenShare ? 'h-32 md:h-36 shrink-0' : 'flex-1'}`}>
                     
                     {/* Local User Card */}
@@ -252,7 +262,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
                             onClick={onToggleScreenShare} 
                             className={`p-3 rounded-xl transition-all active:scale-95 ${hasScreenShare ? 'bg-emerald-500 text-white' : 'bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'}`}
                         >
-                            <Monitor size={20} />
+                            {hasScreenShare ? <MonitorOff size={20} /> : <Monitor size={20} />}
                         </button>
                     </div>
 

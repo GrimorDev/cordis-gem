@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sparkles, Bell, Users, Settings, MessageSquare, Search, UserPlus } from 'lucide-react';
 import { ServerList } from './components/ServerList';
 import { ChannelList } from './components/ChannelList';
@@ -16,6 +16,7 @@ import { generateAIResponse } from './services/geminiService';
 const App: React.FC = () => {
   const [servers, setServers] = useState<Server[]>(INITIAL_SERVERS);
   const [currentUser, setCurrentUser] = useState<User>(MOCK_USER);
+  const [friends, setFriends] = useState<User[]>([]);
   const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({});
 
   const [activeServerId, setActiveServerId] = useState<string | 'DM'>(servers[0]?.id || 'DM');
@@ -32,56 +33,83 @@ const App: React.FC = () => {
   const [isDeafened, setIsDeafened] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
 
-  // Inicjalizacja danych z API z obsługą błędów i weryfikacją statusu
+  // Status management
+  const [manualStatus, setManualStatus] = useState<UserStatus>(MOCK_USER.status);
+
+  // 1. Inicjalizacja danych z API
   useEffect(() => {
-    const fetchData = async () => {
-        try {
-            const serversRes = await fetch('/api/servers');
-            if (!serversRes.ok) throw new Error(`HTTP error! status: ${serversRes.status}`);
-            
-            const serversData = await serversRes.json();
-            if (Array.isArray(serversData) && serversData.length > 0) {
-                const mappedServers = serversData.map((s: any) => ({
-                    ...s,
-                    ownerId: s.owner_id,
-                    roles: typeof s.roles === 'string' ? JSON.parse(s.roles) : s.roles,
-                    categories: typeof s.categories === 'string' ? JSON.parse(s.categories) : s.categories
-                }));
-                setServers(mappedServers);
-            }
-        } catch (e) {
-            console.warn("Fetch servers error - using local INITIAL_SERVERS", e);
+    const initData = async () => {
+      try {
+        // Pobierz profil usera
+        const userRes = await fetch(`/api/users/${MOCK_USER.id}`);
+        const userData = await userRes.json();
+        if (userData) {
+          setCurrentUser(prev => ({ ...prev, ...userData, settings: { ...prev.settings, ...(userData.settings || {}) } }));
+          setManualStatus(userData.status);
         }
+
+        // Pobierz znajomych (DM)
+        const friendsRes = await fetch(`/api/friends/${MOCK_USER.id}`);
+        setFriends(await friendsRes.json());
+
+        // Pobierz serwery
+        const serversRes = await fetch('/api/servers');
+        const serversData = await serversRes.json();
+        if (Array.isArray(serversData) && serversData.length > 0) {
+          setServers(serversData.map((s: any) => ({
+            ...s,
+            ownerId: s.owner_id,
+            roles: typeof s.roles === 'string' ? JSON.parse(s.roles) : s.roles,
+            categories: typeof s.categories === 'string' ? JSON.parse(s.categories) : s.categories
+          })));
+        }
+      } catch (e) {
+        console.warn("Backend error - fallback to local constants", e);
+      }
     };
-    fetchData();
+    initData();
   }, []);
 
-  // Pobieranie wiadomości przy zmianie kanału
+  // 2. Automatyczna synchronizacja statusu (w tym IN_CALL)
   useEffect(() => {
-    if (activeChannelId && activeChannelId !== 'dm-gemini' && !messagesMap[activeChannelId]) {
-        const fetchMessages = async () => {
-            try {
-                const res = await fetch(`/api/messages/${activeChannelId}`);
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    const mapped = data.map((m: any) => ({
-                        ...m,
-                        senderId: m.sender_id,
-                        channelId: m.channel_id,
-                        replyToId: m.reply_to_id,
-                        isDeleted: m.is_deleted,
-                        isEdited: m.is_edited,
-                        timestamp: new Date(m.timestamp)
-                    }));
-                    setMessagesMap(prev => ({ ...prev, [activeChannelId]: mapped }));
-                }
-            } catch (e) {
-                console.warn("Messages fetch error", e);
-            }
-        };
-        fetchMessages();
+    const syncStatus = async () => {
+      const targetStatus = activeVoiceChannelId ? UserStatus.IN_CALL : manualStatus;
+      if (currentUser.status !== targetStatus) {
+        setCurrentUser(prev => ({ ...prev, status: targetStatus }));
+        try {
+          await fetch(`/api/users/${currentUser.id}/status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: targetStatus })
+          });
+        } catch(e) {}
+      }
+    };
+    syncStatus();
+  }, [activeVoiceChannelId, manualStatus, currentUser.id]);
+
+  const handleStatusChange = useCallback((newStatus: UserStatus) => {
+    setManualStatus(newStatus);
+  }, []);
+
+  // 3. Pobieranie wiadomości przy zmianie kanału
+  useEffect(() => {
+    if (activeChannelId && !messagesMap[activeChannelId]) {
+      const fetchMsgs = async () => {
+        try {
+          const res = await fetch(`/api/messages/${activeChannelId}`);
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setMessagesMap(prev => ({ ...prev, [activeChannelId]: data.map((m: any) => ({
+              ...m,
+              senderId: m.sender_id,
+              replyToId: m.reply_to_id,
+              timestamp: new Date(m.timestamp)
+            })) }));
+          }
+        } catch(e) {}
+      };
+      fetchMsgs();
     }
   }, [activeChannelId]);
 
@@ -89,7 +117,6 @@ const App: React.FC = () => {
     document.documentElement.setAttribute('data-theme', currentUser.settings.theme);
   }, [currentUser]);
 
-  // Set initial channel on load if not set
   useEffect(() => {
     if (!activeChannelId && activeServerId !== 'DM') {
       const s = servers.find(sv => sv.id === activeServerId);
@@ -98,13 +125,13 @@ const App: React.FC = () => {
     } else if (!activeChannelId && activeServerId === 'DM') {
       setActiveChannelId('dm-gemini');
     }
-  }, [servers, activeServerId]);
+  }, [servers, activeServerId, activeChannelId]);
 
   const activeServer = servers.find(s => s.id === activeServerId);
   
   const dmChannels = [
     { id: 'dm-gemini', name: 'Gemini AI', avatar: GEMINI_BOT.avatar, status: UserStatus.ONLINE, user: GEMINI_BOT },
-    { id: 'dm-support', name: 'Support Bot', avatar: 'https://picsum.photos/101', status: UserStatus.IDLE, user: { ...GEMINI_BOT, username: 'Support Bot', id: 'dm-support', avatar: 'https://picsum.photos/101' } }
+    ...friends.map(f => ({ id: `dm-${f.id}`, name: f.username, avatar: f.avatar, status: f.status, user: f }))
   ];
 
   const activeChannel = activeServerId === 'DM' 
@@ -112,18 +139,6 @@ const App: React.FC = () => {
     : activeServer?.categories?.flatMap(c => c.channels).find(c => c.id === activeChannelId);
 
   const activeDMUser = activeServerId === 'DM' ? dmChannels.find(d => d.id === activeChannelId)?.user : null;
-
-  const syncServer = async (server: Server) => {
-    try {
-        await fetch('/api/servers', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(server)
-        });
-    } catch (e) {
-        console.error("Sync server failed", e);
-    }
-  };
 
   const handleSendMessage = async (content: string, replyToId?: string, attachment?: any) => {
     if (!activeChannelId) return;
@@ -136,172 +151,73 @@ const App: React.FC = () => {
         attachment
     };
     
-    setMessagesMap(prev => ({ 
-        ...prev, 
-        [activeChannelId]: [...(prev[activeChannelId] || []), newMessage] 
-    }));
+    setMessagesMap(prev => ({ ...prev, [activeChannelId]: [...(prev[activeChannelId] || []), newMessage] }));
 
-    // Save to DB
     try {
-        await fetch('/api/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ...newMessage,
-                channel_id: activeChannelId,
-                sender_id: currentUser.id,
-                reply_to_id: replyToId
-            })
-        });
-    } catch (e) {
-        console.error("Save message failed", e);
-    }
+      await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          ...newMessage, 
+          channel_id: activeChannelId, 
+          sender_id: currentUser.id,
+          reply_to_id: replyToId
+        })
+      });
+    } catch(e) {}
     
-    if (activeChannelId === 'dm-gemini' || content.toLowerCase().includes('gemini')) {
+    if (activeChannelId.includes('gemini') || content.toLowerCase().includes('gemini')) {
       setTypingUsers([GEMINI_BOT.username]);
       const response = await generateAIResponse(content);
-      
       setTimeout(async () => {
         setTypingUsers([]);
-        const aiMsg: Message = { 
-            id: (Date.now()+1).toString(), 
-            content: response, 
-            senderId: GEMINI_BOT.id, 
-            timestamp: new Date(),
-            replyToId: newMessage.id
-        };
+        const aiMsg: Message = { id: Date.now().toString(), content: response, senderId: GEMINI_BOT.id, timestamp: new Date(), replyToId: newMessage.id };
         setMessagesMap(prev => ({ ...prev, [activeChannelId]: [...(prev[activeChannelId] || []), aiMsg] }));
-        
-        // Save AI msg to DB
         try {
-            await fetch('/api/messages', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...aiMsg,
-                    channel_id: activeChannelId,
-                    sender_id: GEMINI_BOT.id,
-                    reply_to_id: newMessage.id
-                })
-            });
-        } catch (e) {
-            console.error("Save AI message failed", e);
-        }
+          await fetch('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...aiMsg, channel_id: activeChannelId, sender_id: GEMINI_BOT.id, reply_to_id: newMessage.id })
+          });
+        } catch(e) {}
       }, 1500);
     }
-  };
-
-  const handleDeleteMessage = (messageId: string) => {
-    if (!activeChannelId) return;
-    setMessagesMap(prev => ({
-      ...prev,
-      [activeChannelId]: prev[activeChannelId].map(m => m.id === messageId ? { ...m, isDeleted: true, content: 'Ta wiadomość została usunięta.' } : m)
-    }));
-  };
-
-  const handleUpdateMessage = (messageId: string, newContent: string) => {
-    if (!activeChannelId) return;
-    setMessagesMap(prev => ({
-      ...prev,
-      [activeChannelId]: prev[activeChannelId].map(m => 
-        m.id === messageId ? { ...m, content: newContent, isEdited: true } : m
-      )
-    }));
   };
 
   const handleModalSubmit = async (data: any) => {
     let shouldClose = true;
 
     if (modalType === 'SETTINGS') {
-      const updatedUser: User = {
-        ...currentUser,
-        username: data.username || currentUser.username,
-        avatar: data.avatar || currentUser.avatar,
-        settings: { ...currentUser.settings, ...data.settings }
-      };
+      const updatedUser = { ...currentUser, username: data.username, avatar: data.avatar, settings: { ...currentUser.settings, ...data.settings } };
       setCurrentUser(updatedUser);
-    } else if (modalType === 'ADD_FRIEND') {
-        const friendId = data.friendId;
-        // Mocking friend addition
-        setCurrentUser(prev => ({ ...prev, friends: [...(prev.friends || []), friendId] }));
-    } else if (modalType === 'SERVER_SETTINGS') {
-      if (data._action === 'DELETE_SERVER') {
-        try {
-            await fetch(`/api/servers/${data.id}`, { method: 'DELETE' });
-            const remainingServers = servers.filter(s => s.id !== data.id);
-            setServers(remainingServers);
-            setActiveServerId('DM');
-            setActiveChannelId('dm-gemini');
-        } catch (e) {
-            console.error("Delete server failed", e);
-        }
-        shouldClose = true;
-      } else {
-        setServers(prev => prev.map(s => s.id === data.id ? data : s));
-        await syncServer(data);
-        shouldClose = false; 
-      }
-    } else if (modalType === 'EDIT_CHANNEL') {
-      setServers(prev => prev.map(s => s.id === activeServerId ? data : s));
-      await syncServer(data);
+      await fetch(`/api/users/${currentUser.id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(updatedUser) });
     } else if (modalType === 'CREATE_SERVER') {
-      const newServerId = 's-' + Date.now();
       const newServer: Server = {
-        id: newServerId,
+        id: 's-' + Date.now(),
         name: data.name,
         icon: 'https://picsum.photos/seed/' + data.name + '/100',
         ownerId: currentUser.id,
         members: [currentUser],
         roles: [...INITIAL_SERVERS[0].roles],
-        categories: [{ id: 'c-gen-' + Date.now(), name: 'General', channels: [{ id: 'ch-' + Date.now(), name: 'ogolny', type: ChannelType.TEXT, messages: [], connectedUserIds: [], categoryId: 'c-gen' }] }]
+        categories: [{ id: 'c-' + Date.now(), name: 'Ogólne', channels: [{ id: 'ch-' + Date.now(), name: 'ogólny', type: ChannelType.TEXT, messages: [], connectedUserIds: [], categoryId: 'c-gen' }] }]
       };
-      const newServersList = [...servers, newServer];
-      setServers(newServersList);
-      await syncServer(newServer);
-      setActiveServerId(newServerId);
+      setServers(prev => [...prev, newServer]);
+      await fetch('/api/servers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(newServer) });
+      setActiveServerId(newServer.id);
       setActiveChannelId(newServer.categories[0].channels[0].id);
-    } else if (modalType === 'CREATE_CATEGORY') {
-        const newCat: ServerCategory = {
-            id: 'cat-' + Date.now(),
-            name: data.name,
-            channels: []
-        };
-        setServers(prev => {
-            const list = prev.map(s => {
-                if (s.id !== activeServerId) return s;
-                const updated = { ...s, categories: [...s.categories, newCat] };
-                syncServer(updated);
-                return updated;
-            });
-            return list;
-        });
-    } else if (modalType === 'CREATE_CHANNEL') {
-        const newCh: Channel = {
-            id: 'ch-' + Date.now(),
-            name: data.name,
-            type: data.type,
-            messages: [],
-            connectedUserIds: [],
-            categoryId: data.categoryId
-        };
-        setServers(prev => {
-            const list = prev.map(s => {
-                if (s.id !== activeServerId) return s;
-                const updated = {
-                    ...s,
-                    categories: s.categories.map(cat => {
-                        if (cat.id !== data.categoryId) return cat;
-                        return { ...cat, channels: [...cat.channels, newCh] };
-                    })
-                };
-                syncServer(updated);
-                return updated;
-            });
-            return list;
-        });
-        if (data.type === ChannelType.TEXT) {
-            setActiveChannelId(newCh.id);
-        }
+    } else if (modalType === 'SERVER_SETTINGS') {
+      if (data._action === 'DELETE_SERVER') {
+        setServers(prev => prev.filter(s => s.id !== data.id));
+        await fetch(`/api/servers/${data.id}`, { method: 'DELETE' });
+        setActiveServerId('DM');
+      } else {
+        setServers(prev => prev.map(s => s.id === data.id ? data : s));
+        await fetch('/api/servers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+      }
+    } else if (modalType === 'EDIT_CHANNEL' || modalType === 'CREATE_CHANNEL' || modalType === 'CREATE_CATEGORY') {
+      // Te akcje aktualizują obiekt serwera, który przesyłamy w całości
+      setServers(prev => prev.map(s => s.id === activeServerId ? data : s));
+      await fetch('/api/servers', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
     }
 
     if (shouldClose) {
@@ -310,48 +226,39 @@ const App: React.FC = () => {
     }
   };
 
-  const openModal = (type: ModalType, data: any = null) => {
-    setModalType(type);
-    setModalData(data);
-  };
-
   const startCall = async (channelId: string, isVideo: boolean = false) => {
-    if (activeVoiceChannelId === channelId) return;
-    
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo || isCameraOn });
+        // Spróbuj uzyskać dostęp do mikrofonu i opcjonalnie kamery
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: true, 
+          video: isVideo || isCameraOn 
+        });
         setLocalStream(stream);
-        setIsCameraOn(isVideo);
+        setIsCameraOn(isVideo || isCameraOn);
         setActiveVoiceChannelId(channelId);
         setIsVoiceMinimized(false);
-
-        if (activeServerId !== 'DM') {
-          setServers(prev => prev.map(s => {
-              if (s.id !== activeServerId) return s;
-              return {
-                  ...s,
-                  categories: s.categories.map(c => ({
-                      ...c,
-                      channels: c.channels.map(ch => {
-                          if (ch.id === channelId) {
-                              return { ...ch, connectedUserIds: Array.from(new Set([...ch.connectedUserIds, currentUser.id, GEMINI_BOT.id])) };
-                          }
-                          if (ch.type === ChannelType.VOICE) {
-                              return { ...ch, connectedUserIds: ch.connectedUserIds.filter(id => id !== currentUser.id) };
-                          }
-                          return ch;
-                      })
-                  }))
-              };
-          }));
-        }
-    } catch (err) {
+    } catch (err: any) { 
         console.error("Call error:", err);
-        setActiveVoiceChannelId(channelId);
+        // Fallback: jeśli video nie jest dostępne (np. brak kamery), spróbuj samo audio
+        if (isVideo || isCameraOn) {
+          try {
+            console.log("Video device not found or denied, falling back to audio-only.");
+            const audioOnlyStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            setLocalStream(audioOnlyStream);
+            setIsCameraOn(false);
+            setActiveVoiceChannelId(channelId);
+            setIsVoiceMinimized(false);
+          } catch (audioErr) {
+            console.error("Audio fallback failed:", audioErr);
+            alert("Błąd: Nie można uzyskać dostępu do mikrofonu. Sprawdź ustawienia prywatności przeglądarki.");
+          }
+        } else {
+          alert("Błąd: Nie można uzyskać dostępu do mikrofonu. Sprawdź połączenie urządzeń.");
+        }
     }
   };
 
-  const handleToggleScreenShare = async () => {
+  const toggleScreenShare = async () => {
     if (screenStream) {
       screenStream.getTracks().forEach(t => t.stop());
       setScreenStream(null);
@@ -362,39 +269,23 @@ const App: React.FC = () => {
           setScreenStream(null);
         };
         setScreenStream(stream);
-      } catch (err) {
-        console.error("Screen share error:", err);
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError') {
+          console.warn("Screen share permission denied by user.");
+        } else {
+          console.error("Screen share error:", err);
+        }
       }
     }
   };
 
   const stopCall = () => {
-    if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
-    }
-    if (screenStream) {
-        screenStream.getTracks().forEach(t => t.stop());
-    }
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    if (screenStream) screenStream.getTracks().forEach(t => t.stop());
     setLocalStream(null);
     setScreenStream(null);
-    const prevVoiceId = activeVoiceChannelId;
     setActiveVoiceChannelId(null);
     setIsVoiceMinimized(false);
-
-    if (prevVoiceId && activeServerId !== 'DM') {
-        setServers(prev => prev.map(s => ({
-            ...s,
-            categories: s.categories.map(c => ({
-                ...c,
-                channels: c.channels.map(ch => {
-                    if (ch.id === prevVoiceId) {
-                        return { ...ch, connectedUserIds: ch.connectedUserIds.filter(id => id !== currentUser.id && id !== GEMINI_BOT.id) };
-                    }
-                    return ch;
-                })
-            }))
-        })));
-    }
   };
 
   return (
@@ -404,14 +295,9 @@ const App: React.FC = () => {
         activeServerId={activeServerId} 
         onSwitchServer={(id) => {
             setActiveServerId(id);
-            if (id === 'DM') {
-                setActiveChannelId('dm-gemini');
-            } else {
-                const s = servers.find(sv => sv.id === id);
-                setActiveChannelId(s?.categories?.[0]?.channels?.[0]?.id || null);
-            }
+            setActiveChannelId(null);
         }} 
-        onAddServer={() => openModal('CREATE_SERVER')}
+        onAddServer={() => setModalType('CREATE_SERVER')}
       />
 
       <div className="flex-1 flex overflow-hidden">
@@ -427,7 +313,7 @@ const App: React.FC = () => {
                         />
                     </div>
                     <button 
-                      onClick={() => openModal('ADD_FRIEND')}
+                      onClick={() => setModalType('ADD_FRIEND')}
                       className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-600/10 text-emerald-500 hover:bg-emerald-600/20 text-[11px] font-black uppercase tracking-wider transition-all"
                     >
                       <UserPlus size={14} /> Dodaj znajomego
@@ -452,13 +338,13 @@ const App: React.FC = () => {
                 <div className="p-4 bg-[#0c0c0c] border-t border-white/10 flex items-center gap-3">
                     <div className="relative shrink-0">
                         <img src={currentUser.avatar} className="w-9 h-9 rounded-xl object-cover ring-1 ring-white/10 shadow-lg shadow-black/50" />
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0c0c0c] ${currentUser.status === UserStatus.ONLINE ? 'bg-emerald-500' : 'bg-slate-500'}`} />
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0c0c0c] ${manualStatus === UserStatus.ONLINE ? 'bg-emerald-500' : 'bg-slate-500'}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-[12px] font-black text-white truncate tracking-tight">{currentUser.username}</p>
                         <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest opacity-60">#{currentUser.discriminator}</p>
                     </div>
-                    <button onClick={() => openModal('SETTINGS')} className="p-1.5 hover:bg-white/5 text-v-muted hover:text-white rounded-lg"><Settings size={16}/></button>
+                    <button onClick={() => setModalType('SETTINGS')} className="p-1.5 hover:bg-white/5 text-v-muted hover:text-white rounded-lg"><Settings size={16}/></button>
                 </div>
             </div>
           ) : (
@@ -469,13 +355,12 @@ const App: React.FC = () => {
               currentUser={currentUser}
               onSelectChannel={(id) => {
                   const ch = activeServer?.categories?.flatMap(c => c.channels).find(c => c.id === id);
-                  if (ch?.type === ChannelType.VOICE) { 
-                      startCall(id);
-                  }
+                  if (ch?.type === ChannelType.VOICE) startCall(id);
                   else setActiveChannelId(id);
               }}
-              onOpenSettings={openModal}
-              onCreateChannel={(catId) => openModal('CREATE_CHANNEL', catId)}
+              onOpenSettings={(t, d) => { setModalType(t); setModalData(d); }}
+              onStatusChange={handleStatusChange}
+              onCreateChannel={(catId) => { setModalType('CREATE_CHANNEL'); setModalData(catId); }}
             />
           )}
         </aside>
@@ -483,40 +368,16 @@ const App: React.FC = () => {
         <div className="flex-1 flex flex-col min-w-0 bg-v0 transition-all duration-200">
           <header className="h-[64px] border-b border-v flex items-center justify-between px-8 shrink-0 z-10 bg-v0/80 backdrop-blur-md">
             <div className="flex items-center gap-4 min-w-0">
-              {activeServerId === 'DM' ? (
-                <div className="flex items-center gap-3">
-                   <div className="text-v-muted"><MessageSquare size={20} /></div>
-                   <h1 className="text-lg font-black tracking-tight truncate">{activeChannel?.name || 'Wybierz rozmowę'}</h1>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                   <div className="text-v-muted"><Sparkles size={20} /></div>
-                   <h1 className="text-lg font-black tracking-tight truncate">{activeServer?.name || 'Wybierz serwer'}</h1>
-                   {activeChannel && (
-                     <div className="flex items-center gap-2 text-v-muted font-bold text-xs uppercase tracking-widest">
-                        <span className="opacity-30">/</span>
-                        <span className="text-indigo-400">#{activeChannel.name}</span>
-                     </div>
-                   )}
-                </div>
-              )}
+              <div className="text-v-muted"><MessageSquare size={20} /></div>
+              <h1 className="text-lg font-black tracking-tight truncate">{activeChannel?.name || 'Wybierz kanał'}</h1>
             </div>
             <div className="flex items-center gap-4">
                {activeServerId === 'DM' && activeDMUser && (
                  <div className="flex items-center gap-2 mr-2">
-                    <button onClick={() => startCall(activeChannelId || '', false)} className="p-2 text-v-muted hover:text-emerald-500 transition-colors"><Bell size={20}/></button>
-                    <button onClick={() => startCall(activeChannelId || '', true)} className="p-2 text-v-muted hover:text-indigo-500 transition-colors"><Sparkles size={20}/></button>
+                    <button onClick={() => startCall(activeChannelId || '', false)} className="p-2 text-v-muted hover:text-emerald-500"><Bell size={20}/></button>
+                    <button onClick={() => startCall(activeChannelId || '', true)} className="p-2 text-v-muted hover:text-indigo-500"><Sparkles size={20}/></button>
                  </div>
                )}
-               {activeServerId !== 'DM' && (
-                 <button 
-                  onClick={() => openModal('INVITE', activeServer)}
-                  className="px-3 py-1.5 bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20"
-                 >
-                   Zaproś
-                 </button>
-               )}
-               {activeServerId !== 'DM' && <button onClick={() => openModal('SERVER_SETTINGS')} className="p-2 text-v-muted hover:text-white hover:bg-v2 rounded-lg transition-all"><Settings size={18}/></button>}
                <button className="p-2 text-v-muted hover:text-white"><Bell size={18}/></button>
                <button className="p-2 text-v-muted hover:text-white"><Users size={18}/></button>
             </div>
@@ -524,14 +385,13 @@ const App: React.FC = () => {
 
           <div className="flex-1 flex overflow-hidden">
             <main className="flex-1 flex flex-col bg-v0 relative min-w-0">
-                {activeChannelId && activeChannel ? (
+                {activeChannelId ? (
                     <ChatArea 
                         channel={activeChannel as any}
                         messages={messagesMap[activeChannelId] || []}
                         members={activeServer?.members || [currentUser, GEMINI_BOT]}
                         onSendMessage={handleSendMessage}
-                        onDeleteMessage={handleDeleteMessage}
-                        onUpdateMessage={handleUpdateMessage}
+                        onDeleteMessage={(id) => setMessagesMap(prev => ({ ...prev, [activeChannelId]: prev[activeChannelId].filter(m => m.id !== id) }))}
                         currentUser={currentUser}
                         typingUsers={typingUsers}
                         activeServer={activeServer}
@@ -555,7 +415,7 @@ const App: React.FC = () => {
             isVoiceMinimized ? (
               <MiniPlayer 
                 stream={localStream} 
-                channelName={activeServerId === 'DM' ? activeChannel?.name : activeServer?.categories?.flatMap(c => c.channels).find(ch => ch.id === activeVoiceChannelId)?.name}
+                channelName={activeChannel?.name}
                 isMicMuted={isMicMuted}
                 isDeafened={isDeafened}
                 onExpand={() => setIsVoiceMinimized(false)}
@@ -573,9 +433,9 @@ const App: React.FC = () => {
                 onToggleMic={() => setIsMicMuted(!isMicMuted)}
                 onToggleDeafen={() => setIsDeafened(!isDeafened)}
                 onToggleCamera={() => setIsCameraOn(!isCameraOn)}
-                onToggleScreenShare={handleToggleScreenShare} 
+                onToggleScreenShare={toggleScreenShare} 
                 onDisconnect={stopCall}
-                onOpenSettings={() => openModal('DEVICE_SETTINGS')}
+                onOpenSettings={() => setModalType('DEVICE_SETTINGS')}
                 onMinimize={() => setIsVoiceMinimized(true)}
               />
             )
@@ -586,7 +446,7 @@ const App: React.FC = () => {
       <ModalManager 
         isOpen={!!modalType}
         type={modalType}
-        onClose={() => { setModalType(null); setModalData(null); }}
+        onClose={() => setModalType(null)}
         onSubmit={handleModalSubmit}
         currentUser={currentUser}
         activeServer={activeServer}

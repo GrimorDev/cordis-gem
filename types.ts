@@ -8,7 +8,8 @@ export enum UserStatus {
   ONLINE = 'ONLINE',
   IDLE = 'IDLE',
   DND = 'DND',
-  OFFLINE = 'OFFLINE'
+  OFFLINE = 'OFFLINE',
+  IN_CALL = 'IN_CALL'
 }
 
 export enum Language {

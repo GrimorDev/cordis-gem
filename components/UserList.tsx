@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { User, UserStatus, Server } from '../types';
 import { MessageSquare, MoreHorizontal } from 'lucide-react';
@@ -19,6 +20,12 @@ const StatusBadge: React.FC<{ status: UserStatus }> = ({ status }) => {
       return (
         <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-[3px] border-black bg-rose-500 flex items-center justify-center" title="Nie przeszkadzać">
           <div className="w-1.5 h-[2px] bg-white rounded-full" />
+        </div>
+      );
+    case UserStatus.IN_CALL:
+      return (
+        <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-[3px] border-black bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.8)] animate-pulse flex items-center justify-center" title="W trakcie rozmowy">
+           <div className="w-1.5 h-1.5 bg-white rounded-full" />
         </div>
       );
     case UserStatus.OFFLINE:
@@ -49,7 +56,7 @@ const UserItem: React.FC<{ user: User; server?: Server }> = ({ user, server }) =
             <MessageSquare size={14} className="text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
         <p className="text-[10px] text-slate-500 font-black truncate tracking-widest uppercase opacity-60 mt-0.5">
-          {user.isBot ? "Neural Network" : user.id === 'u1' ? "System Admin" : "Playing Cordis v2.0"}
+          {user.status === UserStatus.IN_CALL ? "W trakcie rozmowy" : user.isBot ? "Neural Network" : user.id === 'u1' ? "System Admin" : "Playing Cordis v2.0"}
         </p>
       </div>
     </div>
