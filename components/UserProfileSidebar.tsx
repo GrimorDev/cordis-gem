@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserStatus } from '../types';
-import { ChevronRight, Phone, Video, MoreHorizontal, ShieldCheck } from 'lucide-react';
+import { ChevronRight, Phone, Video, MoreHorizontal, ShieldCheck, Sparkles } from 'lucide-react';
 
 interface UserProfileSidebarProps {
   user: User;
@@ -76,6 +76,13 @@ export const UserProfileSidebar: React.FC<UserProfileSidebarProps> = ({ user, on
             </div>
             {user.isBot && <span className="text-[9px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded uppercase font-black tracking-widest inline-block mb-3">AI Model</span>}
             
+            {user.customStatus && (
+              <div className="flex items-center gap-2 mt-2 bg-v1/50 p-2 rounded-lg border border-white/5">
+                <Sparkles size={12} className="text-indigo-400" />
+                <span className="text-xs text-slate-200 italic truncate">{user.customStatus}</span>
+              </div>
+            )}
+
             <div className="h-px bg-white/5 my-4" />
 
             <div className="space-y-4">

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar TEXT,
     discriminator TEXT NOT NULL,
     status TEXT DEFAULT 'ONLINE',
+    custom_status TEXT,
     settings JSONB DEFAULT '{}'::jsonb
 );
 

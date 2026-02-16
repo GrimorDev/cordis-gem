@@ -14,6 +14,7 @@ export const MOCK_USER: User = {
   status: UserStatus.ONLINE,
   avatar: 'https://picsum.photos/200',
   roleIds: ['r-admin'],
+  joinedAt: '2025-01-17T12:00:00Z',
   settings: {
     language: Language.PL,
     theme: Theme.DARK,
@@ -34,6 +35,7 @@ export const GEMINI_BOT: User = {
   isBot: true,
   avatar: 'https://picsum.photos/201',
   roleIds: ['r-mod'],
+  joinedAt: '2025-01-18T09:00:00Z',
   settings: {
     language: Language.EN,
     theme: Theme.DARK,

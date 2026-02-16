@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Hash, Smile, Gift, Box, MoreVertical, Reply, Trash2, X, Image as ImageIcon, Send, Mic, Square, Play, Pause, Edit3 } from 'lucide-react';
+import { Plus, Hash, Smile, Gift, Box, MoreVertical, Reply, Trash2, X, Image as ImageIcon, Send, Mic, Square, Play, Pause, Edit3, ExternalLink, Globe } from 'lucide-react';
 import { Channel, Message, User, Server } from '../types';
 import { fileToBase64, getUserRoleColor } from '../utils/helpers';
 
@@ -14,6 +15,76 @@ interface ChatAreaProps {
   typingUsers?: string[];
   activeServer?: Server;
 }
+
+const extractFirstUrl = (text: string): string | null => {
+  if (!text) return null;
+  const match = text.match(/(https?:\/\/[^\s]+)/);
+  return match ? match[0] : null;
+};
+
+const LinkPreview: React.FC<{ url: string }> = ({ url }) => {
+  const [domain, setDomain] = useState('');
+  const [isYoutube, setIsYoutube] = useState(false);
+  const [youtubeId, setYoutubeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const urlObj = new URL(url);
+      setDomain(urlObj.hostname);
+      
+      if (urlObj.hostname.includes('youtube.com') || urlObj.hostname.includes('youtu.be')) {
+        setIsYoutube(true);
+        const vParam = urlObj.searchParams.get('v');
+        if (vParam) setYoutubeId(vParam);
+        else if (urlObj.hostname.includes('youtu.be')) setYoutubeId(urlObj.pathname.slice(1));
+      } else {
+        setIsYoutube(false);
+      }
+    } catch (e) {
+      setDomain(url);
+    }
+  }, [url]);
+
+  return (
+    <div className="mt-2 flex flex-col max-w-[400px] bg-[#1e1f22] border-l-4 border-indigo-500 rounded-r-md overflow-hidden shadow-sm">
+      <div className="p-3">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{isYoutube ? 'YouTube' : 'Website'}</span>
+        </div>
+        <a href={url} target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-400 hover:underline block mb-1 truncate text-sm">
+          {isYoutube ? 'Wideo na YouTube' : domain}
+        </a>
+        <p className="text-xs text-slate-400 line-clamp-2 mb-3">
+          {isYoutube ? 'Kliknij, aby obejrzeć ten materiał wideo w nowej karcie.' : `Odwiedź stronę ${url} aby zobaczyć więcej informacji.`}
+        </p>
+        
+        {isYoutube && youtubeId && (
+          <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-white/5 bg-black">
+             <img src={`https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg`} className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity" />
+             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm">
+                   <Play size={20} fill="white" className="text-white ml-1" />
+                </div>
+             </div>
+          </div>
+        )}
+        
+        {!isYoutube && (
+           <div className="flex items-center gap-2 p-2 bg-[#2b2d31] rounded-lg border border-white/5">
+              <div className="p-2 bg-indigo-500/10 rounded-lg">
+                 <Globe size={16} className="text-indigo-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-white truncate">{domain}</div>
+                  <div className="text-[10px] text-slate-500 truncate">{url}</div>
+              </div>
+              <ExternalLink size={14} className="text-slate-500" />
+           </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const VoicePlayer: React.FC<{ url: string }> = ({ url }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -180,7 +251,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ channel, messages, members, 
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full opacity-20">
             <Box size={60} />
-            <p className="mt-4 font-black uppercase tracking-widest text-xs text-center">Początek historii kanału #{channel.name}</p>
+            <p className="mt-4 font-black uppercase tracking-widest text-xs text-center">Początek historii kanału #{channel?.name || 'Unknown'}</p>
           </div>
         )}
         {messages.map((msg) => {
@@ -189,6 +260,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ channel, messages, members, 
           const replyMsg = msg.replyToId ? messages.find(m => m.id === msg.replyToId) : null;
           const isDeleted = msg.isDeleted;
           const isEditing = editingMessageId === msg.id;
+          const linkPreviewUrl = !isDeleted && !isEditing ? extractFirstUrl(msg.content) : null;
 
           return (
             <div key={msg.id} className={`group flex flex-col ${isDeleted ? 'opacity-40' : ''}`}>
@@ -247,10 +319,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ channel, messages, members, 
                         <p className="text-sm italic text-v-muted">{msg.content}</p>
                       ) : (
                         <>
-                          <div className="flex items-end gap-2 flex-wrap">
-                             {msg.content && <p className="text-sm leading-relaxed whitespace-pre-wrap inline">{msg.content}</p>}
+                          <div className="flex flex-col gap-2">
+                             {msg.content && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
                              {msg.isEdited && <span className="text-[9px] text-v-muted font-bold opacity-40 uppercase tracking-tighter mb-0.5">(edytowano)</span>}
+                             
+                             {/* Link Preview */}
+                             {linkPreviewUrl && !msg.attachment && (
+                                <LinkPreview url={linkPreviewUrl} />
+                             )}
                           </div>
+
                           {msg.attachment?.type === 'IMAGE' && (
                             <div className="mt-3 rounded-2xl overflow-hidden border border-v max-w-sm">
                               <img src={msg.attachment.url} className="w-full h-auto" />
@@ -325,7 +403,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({ channel, messages, members, 
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder={`Wiadomość na kanale #${channel.name}`}
+                placeholder={`Wiadomość na kanale #${channel?.name || 'Unknown'}`}
                 className="flex-1 bg-transparent border-none outline-none p-2 text-sm font-medium"
               />
 

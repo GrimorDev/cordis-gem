@@ -1,4 +1,5 @@
 
+
 export enum ChannelType {
   TEXT = 'TEXT',
   VOICE = 'VOICE'
@@ -80,10 +81,12 @@ export interface User {
   avatar?: string;
   discriminator: string;
   status: UserStatus;
+  customStatus?: string;
   isBot?: boolean;
   roleIds?: string[];
   settings: UserSettings;
   friends?: string[]; // IDs of friends
+  joinedAt?: string; // ISO format string
 }
 
 export interface Message {
@@ -149,6 +152,7 @@ export type ModalType =
   | 'CREATE_CHANNEL' 
   | 'CREATE_CATEGORY'
   | 'EDIT_CHANNEL'
+  | 'EDIT_CATEGORY'
   | 'INVITE' 
   | 'SETTINGS' 
   | 'SERVER_SETTINGS'
