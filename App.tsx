@@ -105,6 +105,11 @@ const App: React.FC = () => {
     ? { id: activeChannelId, name: dmChannels.find(d => d.id === activeChannelId)?.name || 'Czat', type: ChannelType.TEXT, categoryId: 'dm' }
     : activeServer?.categories?.flatMap(c => c.channels || [])?.find(c => c.id === activeChannelId), [activeServerId, activeChannelId, dmChannels, activeServer]);
 
+  const dmRecipient = useMemo(() => {
+    if (activeServerId !== 'DM' || !activeChannelId) return null;
+    return dmChannels.find(d => d.id === activeChannelId)?.user;
+  }, [activeServerId, activeChannelId, dmChannels]);
+
   const handleSendMessage = async (content: string, replyToId?: string, attachment?: any) => {
     if (!activeChannelId) return;
     
@@ -313,11 +318,17 @@ const App: React.FC = () => {
                     />
                 ) : ( <div className="flex-1 flex items-center justify-center opacity-10 animate-fade-in"><Sparkles size={100} /></div> )}
             </div>
-            {activeServerId !== 'DM' && (
-              <aside className="w-[280px] border-l border-v bg-v1 shrink-0 hidden xl:block animate-fade-in">
+            <aside className="w-[320px] border-l border-v bg-v1 shrink-0 hidden xl:block animate-fade-in">
+              {activeServerId !== 'DM' ? (
                 <UserList members={activeServer?.members || []} server={activeServer} onUserAction={(u, a) => { if(a==='MESSAGE') { setActiveServerId('DM'); setActiveChannelId(`dm-${u.id}`); }}} />
-              </aside>
-            )}
+              ) : dmRecipient ? (
+                <UserProfileSidebar 
+                    user={dmRecipient} 
+                    onCall={() => startCall(activeChannelId!, false)} 
+                    onVideoCall={() => startCall(activeChannelId!, true)} 
+                />
+              ) : null}
+            </aside>
           </main>
 
           {activeVoiceChannelId && !isVoiceMinimized && (

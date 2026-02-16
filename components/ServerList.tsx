@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Plus, Search, MessageSquare, Sparkles } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Search, MessageSquare, Sparkles, X } from 'lucide-react';
 import { Server } from '../types';
 
 interface ServerListProps {
@@ -11,6 +11,14 @@ interface ServerListProps {
 }
 
 export const ServerList: React.FC<ServerListProps> = ({ servers, activeServerId, onSwitchServer, onAddServer }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredServers = useMemo(() => {
+    return servers.filter(server => 
+      server.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [servers, searchQuery]);
+
   return (
     <nav className="h-[72px] w-full bg-v1/80 backdrop-blur-xl border-b border-white/5 flex items-center px-6 gap-2 shrink-0 z-50 sticky top-0 shadow-2xl">
       {/* DM / Home Action */}
@@ -35,29 +43,35 @@ export const ServerList: React.FC<ServerListProps> = ({ servers, activeServerId,
 
       {/* Servers Container */}
       <div className="flex items-center gap-3 flex-1 overflow-x-auto no-scrollbar scroll-smooth py-2">
-        {servers.map((server) => (
-          <div key={server.id} className="relative group shrink-0">
-            <div 
-              className={`flex items-center gap-3 px-3 py-2 rounded-2xl border transition-all duration-300 cursor-pointer active:scale-95 group-hover:translate-y-[-2px] ${
-                activeServerId === server.id 
-                ? 'bg-indigo-600/20 border-indigo-500/50 shadow-lg shadow-black/20' 
-                : 'bg-v2/40 border-white/5 hover:border-white/20 hover:bg-v2 shadow-sm'
-              }`} 
-              onClick={() => onSwitchServer(server.id)}
-            >
-              <div className={`w-9 h-9 rounded-xl overflow-hidden shrink-0 shadow-inner transition-all duration-300 ${activeServerId === server.id ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-v1' : 'group-hover:rounded-lg'}`}>
-                <img src={server.icon} alt={server.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+        {filteredServers.length > 0 ? (
+          filteredServers.map((server) => (
+            <div key={server.id} className="relative group shrink-0 animate-scale-in">
+              <div 
+                className={`flex items-center gap-3 px-3 py-2 rounded-2xl border transition-all duration-300 cursor-pointer active:scale-95 group-hover:translate-y-[-2px] ${
+                  activeServerId === server.id 
+                  ? 'bg-indigo-600/20 border-indigo-500/50 shadow-lg shadow-black/20' 
+                  : 'bg-v2/40 border-white/5 hover:border-white/20 hover:bg-v2 shadow-sm'
+                }`} 
+                onClick={() => onSwitchServer(server.id)}
+              >
+                <div className={`w-9 h-9 rounded-xl overflow-hidden shrink-0 shadow-inner transition-all duration-300 ${activeServerId === server.id ? 'ring-2 ring-indigo-400 ring-offset-2 ring-offset-v1' : 'group-hover:rounded-lg'}`}>
+                  <img src={server.icon} alt={server.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                </div>
+                <span className={`text-[12px] font-black truncate max-w-[140px] tracking-tight transition-colors ${activeServerId === server.id ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
+                    {server.name}
+                </span>
               </div>
-              <span className={`text-[12px] font-black truncate max-w-[140px] tracking-tight transition-colors ${activeServerId === server.id ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>
-                  {server.name}
-              </span>
+              
+              {activeServerId === server.id && (
+                 <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,1)] animate-fade-in" />
+              )}
             </div>
-            
-            {activeServerId === server.id && (
-               <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-10 h-1 bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,1)] animate-fade-in" />
-            )}
+          ))
+        ) : searchQuery ? (
+          <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-4 animate-fade-in">
+            Nie znaleziono serwerów
           </div>
-        ))}
+        ) : null}
 
         {/* Add Server Button */}
         <button 
@@ -74,9 +88,19 @@ export const ServerList: React.FC<ServerListProps> = ({ servers, activeServerId,
          <div className="relative group">
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
             <input 
-                placeholder="Szukaj wszędzie..." 
-                className="bg-v2/60 border border-white/5 rounded-2xl py-2.5 pl-11 pr-4 text-[12px] font-bold outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/5 w-48 xl:w-64 transition-all text-white placeholder:text-slate-600 shadow-inner"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Szukaj serwerów..." 
+                className="bg-v2/60 border border-white/5 rounded-2xl py-2.5 pl-11 pr-10 text-[12px] font-bold outline-none focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/5 w-48 xl:w-64 transition-all text-white placeholder:text-slate-600 shadow-inner"
             />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+              >
+                <X size={14} />
+              </button>
+            )}
          </div>
          
          <button className="w-11 h-11 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 cursor-pointer hover:bg-indigo-600 hover:text-white hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] transition-all duration-300 group">
