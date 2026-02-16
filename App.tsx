@@ -22,7 +22,14 @@ const SOUNDS = {
 
 const App: React.FC = () => {
   const [servers, setServers] = useState<Server[]>(INITIAL_SERVERS);
-  const [currentUser, setCurrentUser] = useState<User>(MOCK_USER);
+  const [currentUser, setCurrentUser] = useState<User>({
+      ...MOCK_USER,
+      settings: {
+          ...MOCK_USER.settings,
+          notificationSounds: true,
+          displayDensity: 'COZY'
+      }
+  });
   const [friends, setFriends] = useState<User[]>([]);
   const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({});
 
@@ -43,10 +50,11 @@ const App: React.FC = () => {
   const [manualStatus, setManualStatus] = useState<UserStatus>(MOCK_USER.status);
 
   const playSystemSound = useCallback((soundUrl: string) => {
+    if (!currentUser.settings.notificationSounds) return;
     const audio = new Audio(soundUrl);
     audio.volume = 0.3;
     audio.play().catch(() => {});
-  }, []);
+  }, [currentUser.settings.notificationSounds]);
 
   const handleStatusChange = useCallback((status: UserStatus) => {
     setManualStatus(status);
@@ -62,7 +70,7 @@ const App: React.FC = () => {
         members: s.members.map(m => m.id === updatedUser.id ? updatedUser : m)
       })));
     }
-  }, [activeVoiceChannelId, manualStatus]);
+  }, [activeVoiceChannelId, manualStatus, currentUser.id]);
 
   const handleToggleMic = useCallback(() => {
     setIsMicMuted(prev => {
@@ -186,13 +194,27 @@ const App: React.FC = () => {
 
   const startCall = async (channelId: string, isVideo: boolean = false) => {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo || isCameraOn });
+        // Safe stream request - fall back if video or audio is missing
+        let stream: MediaStream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: true, 
+                video: isVideo || isCameraOn 
+            });
+        } catch (e) {
+            console.warn("Full media access failed, trying audio only", e);
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+        
         setLocalStream(stream);
-        setIsCameraOn(isVideo || isCameraOn);
+        setIsCameraOn(stream.getVideoTracks().length > 0);
         setActiveVoiceChannelId(channelId);
         setIsVoiceMinimized(false);
         playSystemSound(SOUNDS.JOIN);
-    } catch (err) { console.error("Call error:", err); }
+    } catch (err) { 
+        console.error("Call error:", err); 
+        alert("Błąd połączenia: Brak dostępnych urządzeń audio/wideo.");
+    }
   };
 
   const stopCall = useCallback(() => {
@@ -300,7 +322,7 @@ const App: React.FC = () => {
             <div className="flex-1 flex flex-col min-w-0">
                 {activeChannelId ? (
                     <ChatArea 
-                        key={activeChannelId} // Important: Key ensures ChatArea resets/transitions on channel switch
+                        key={activeChannelId} 
                         channel={activeChannelObj as any} messages={messagesMap[activeChannelId] || []}
                         members={activeServer?.members || [currentUser, GEMINI_BOT]}
                         onSendMessage={handleSendMessage} 

@@ -33,6 +33,9 @@ export const MOCK_USER: User = {
     language: Language.PL,
     theme: Theme.DARK,
     notifications: true,
+    // Fix: Added missing UserSettings properties
+    notificationSounds: true,
+    displayDensity: 'COZY',
     voiceSensitivity: 80,
     privacyShowActivity: true,
     privacyDirectMessages: true,
@@ -56,6 +59,9 @@ export const GEMINI_BOT: User = {
     language: Language.EN,
     theme: Theme.DARK,
     notifications: false,
+    // Fix: Added missing UserSettings properties
+    notificationSounds: false,
+    displayDensity: 'COZY',
     voiceSensitivity: 100,
     privacyShowActivity: false,
     privacyDirectMessages: false

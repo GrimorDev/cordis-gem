@@ -63,12 +63,13 @@ export interface UserSettings {
   language: Language;
   theme: Theme;
   notifications: boolean;
+  notificationSounds: boolean;
+  displayDensity: 'COZY' | 'COMPACT';
   voiceSensitivity: number;
   privacyShowActivity: boolean;
   privacyDirectMessages: boolean;
   email?: string;
   phone?: string;
-  // Device IDs
   inputDeviceId?: string;
   outputDeviceId?: string;
   videoDeviceId?: string;
@@ -86,8 +87,8 @@ export interface User {
   isBot?: boolean;
   roleIds?: string[];
   settings: UserSettings;
-  friends?: string[]; // IDs of friends
-  joinedAt?: string; // ISO format string
+  friends?: string[];
+  joinedAt?: string;
 }
 
 export interface Message {
@@ -101,9 +102,9 @@ export interface Message {
   attachment?: {
     type: 'IMAGE' | 'GIF' | 'AUDIO';
     url: string;
-    duration?: number; // For audio
+    duration?: number;
   };
-  reactions?: Record<string, string[]>; // emoji -> array of userIds
+  reactions?: Record<string, string[]>;
 }
 
 export interface Channel {
@@ -135,18 +136,6 @@ export interface Server {
   members: User[];
   ownerId: string;
   roles: Role[];
-  invites?: ServerInvite[];
-  notificationSettings?: {
-    mode: 'ALL' | 'MENTIONS' | 'NONE';
-  };
-}
-
-export interface ServerInvite {
-  code: string;
-  creatorId: string;
-  expiresAt?: Date;
-  uses: number;
-  maxUses?: number;
 }
 
 export type ModalType = 
@@ -158,8 +147,6 @@ export type ModalType =
   | 'INVITE' 
   | 'SETTINGS' 
   | 'SERVER_SETTINGS'
-  | 'DELETE_SERVER' 
   | 'DEVICE_SETTINGS' 
-  | 'NOTIFICATION_SETTINGS'
   | 'ADD_FRIEND'
   | null;
