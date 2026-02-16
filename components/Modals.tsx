@@ -1,12 +1,13 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, Shield, Users, Plus, Check, ChevronRight, 
   Ban, UserMinus, Settings, Bell, Upload, Video, VideoOff,
-  Lock, Palette, Monitor, LogOut, Trash2, Volume2, Globe, Hash, Layers, Sliders, Trash, ChevronLeft, AlertCircle, Play, Music, UserPlus, Sparkles, Layout, Link as LinkIcon, Search, ArrowUpDown, UserPen, Image as ImageIcon
+  Lock, Palette, Monitor, LogOut, Trash2, Volume2, Globe, Hash, Layers, Sliders, Trash, ChevronLeft, AlertCircle, Play, Music, UserPlus, Sparkles, Layout, Link as LinkIcon, Search, ArrowUpDown, UserPen, Image as ImageIcon, Compass, ShieldCheck, MicOff, MoreVertical
 } from 'lucide-react';
 import { ModalType, ChannelType, User, Server, Theme, Channel, Role, Permission } from '../types';
 import { fileToBase64 } from '../utils/helpers';
+import { PERMISSIONS_LIST, DEFAULT_ROLES } from '../constants';
 
 interface ModalProps {
     isOpen: boolean;
@@ -58,6 +59,10 @@ export const ModalManager: React.FC<ModalProps> = ({ isOpen, type, onClose, onSu
         </div>
     );
 };
+
+// ... (AddFriendModal, InviteModal, CreateCategoryModal, EditCategoryModal, EditChannelModal, CreateServerModal, CreateChannelModal remain the same)
+// Since they are not changed in this logic, I will provide the updated ServerSettingsModal and include the rest as they were to ensure full file integrity or skip if allowed.
+// To be safe and follow instructions, I will include the full content of the file with the changes applied.
 
 const AddFriendModal = ({ onClose, onSubmit }: any) => {
     const [id, setId] = useState('');
@@ -334,37 +339,79 @@ const EditChannelModal = ({ onClose, onSubmit, channel, activeServer }: { onClos
 };
 
 const CreateServerModal = ({ onClose, onSubmit }: any) => {
+    const [mode, setMode] = useState<'CREATE' | 'JOIN'>('CREATE');
     const [name, setName] = useState('');
+    const [inviteCode, setInviteCode] = useState('');
+
     return (
-        <div className="p-8 bg-v1 text-center">
-            <h2 className="text-2xl font-black text-white mb-2">Stwórz swój serwer</h2>
-            <p className="text-slate-400 text-sm mb-6">Twój serwer to miejsce, gdzie spotkasz się ze znajomymi. Stwórz go i zacznij rozmowę.</p>
-            
-            <div className="flex justify-center mb-6">
-                <div className="w-24 h-24 rounded-full border-2 border-dashed border-slate-500 flex flex-col items-center justify-center text-slate-400 hover:border-white hover:text-white transition-all cursor-pointer bg-[#1e1f22]">
-                    <Upload size={24} className="mb-1" />
-                    <span className="text-[10px] font-bold uppercase">Ikona</span>
-                </div>
+        <div className="bg-v1 flex flex-col h-full md:h-auto overflow-hidden">
+            <div className="p-8 text-center">
+                <h2 className="text-2xl font-black text-white mb-2">
+                    {mode === 'CREATE' ? "Stwórz swój serwer" : "Dołącz do serwera"}
+                </h2>
+                <p className="text-slate-400 text-sm mb-6">
+                    {mode === 'CREATE' 
+                        ? "Twój serwer to miejsce, gdzie spotkasz się ze znajomymi. Stwórz go i zacznij rozmowę."
+                        : "Wpisz zaproszenie poniżej, aby dołączyć do istniejącego serwera."}
+                </p>
+                
+                {mode === 'CREATE' ? (
+                    <>
+                         <div className="flex justify-center mb-6">
+                            <div className="w-24 h-24 rounded-full border-2 border-dashed border-slate-500 flex flex-col items-center justify-center text-slate-400 hover:border-white hover:text-white transition-all cursor-pointer bg-[#1e1f22]">
+                                <Upload size={24} className="mb-1" />
+                                <span className="text-[10px] font-bold uppercase">Ikona</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 mb-8 text-left">
+                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nazwa serwera</label>
+                            <input 
+                                value={name} 
+                                onChange={e => setName(e.target.value)} 
+                                className="w-full bg-[#1e1f22] p-3 rounded-lg text-white font-medium outline-none border border-white/5 focus:border-indigo-500/50" 
+                                placeholder="Mój super serwer" 
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <div className="space-y-2 mb-8 text-left">
+                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Link zaproszenia</label>
+                        <input 
+                            value={inviteCode} 
+                            onChange={e => setInviteCode(e.target.value)} 
+                            className="w-full bg-[#1e1f22] p-3 rounded-lg text-white font-medium outline-none border border-white/5 focus:border-indigo-500/50" 
+                            placeholder="https://cordis.gg/..." 
+                        />
+                         <p className="text-[10px] text-slate-500 mt-1">
+                            Przykłady zaproszeń: <span className="text-slate-400">hTKzmak</span>, <span className="text-slate-400">https://cordis.gg/hTKzmak</span>
+                         </p>
+                    </div>
+                )}
             </div>
 
-            <div className="space-y-2 mb-8 text-left">
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nazwa serwera</label>
-                <input 
-                    value={name} 
-                    onChange={e => setName(e.target.value)} 
-                    className="w-full bg-[#1e1f22] p-3 rounded-lg text-white font-medium outline-none border border-white/5 focus:border-indigo-500/50" 
-                    placeholder="Mój super serwer" 
-                />
-            </div>
-            
-            <div className="flex justify-between items-center bg-v2 -mx-8 -mb-8 p-4">
-                <button onClick={onClose} className="text-white text-sm font-bold hover:underline">Wróć</button>
-                <button 
-                    onClick={() => name.trim() && onSubmit({ name, icon: `https://picsum.photos/seed/${name}/200` })} 
-                    className="bg-indigo-600 text-white px-8 py-2 rounded-md font-bold text-sm hover:bg-indigo-500 transition-all shadow-lg"
-                >
-                    Stwórz
+            <div className="bg-v2 p-4 flex justify-between items-center mt-auto border-t border-white/5">
+                <button onClick={() => setMode(mode === 'CREATE' ? 'JOIN' : 'CREATE')} className="text-slate-400 hover:text-white text-xs font-bold uppercase tracking-wider px-4">
+                     {mode === 'CREATE' ? "Dołącz do serwera" : "Stwórz serwer"}
                 </button>
+                <div className="flex items-center gap-4">
+                     <button onClick={onClose} className="text-white text-sm font-bold hover:underline">Wróć</button>
+                     {mode === 'CREATE' ? (
+                         <button 
+                             onClick={() => name.trim() && onSubmit({ action: 'CREATE', name, icon: `https://picsum.photos/seed/${name}/200` })} 
+                             className="bg-indigo-600 text-white px-8 py-2 rounded-md font-bold text-sm hover:bg-indigo-500 transition-all shadow-lg"
+                         >
+                             Stwórz
+                         </button>
+                     ) : (
+                         <button 
+                             onClick={() => inviteCode.trim() && onSubmit({ action: 'JOIN', inviteCode })} 
+                             className="bg-indigo-600 text-white px-8 py-2 rounded-md font-bold text-sm hover:bg-indigo-500 transition-all shadow-lg"
+                         >
+                             Dołącz
+                         </button>
+                     )}
+                </div>
             </div>
         </div>
     );
@@ -456,66 +503,321 @@ const CreateChannelModal = ({ onClose, onSubmit, categoryId }: any) => {
 
 const ServerSettingsModal = ({ onClose, onSubmit, server }: { onClose: () => void, onSubmit: (d: any) => void, server: Server }) => {
     const [activeTab, setActiveTab] = useState('OVERVIEW');
-    const [name, setName] = useState(server.name);
     
-    const handleDelete = () => {
+    // Używamy lokalnego stanu edycji, aby nie nadpisywać propsów bezpośrednio przed zapisem
+    const [editedServer, setEditedServer] = useState<Server>(server);
+    const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+    const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleDeleteServer = () => {
         if (confirm(`Czy na pewno chcesz usunąć serwer ${server.name}? Ta operacja jest nieodwracalna.`)) {
             onSubmit({ id: server.id, _action: 'DELETE_SERVER' });
+            onClose();
         }
     };
 
+    const handleIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const base64 = await fileToBase64(file);
+            setEditedServer(prev => ({ ...prev, icon: base64 }));
+        }
+    };
+
+    const handleSaveChanges = () => {
+        onSubmit(editedServer);
+        onClose();
+    };
+
+    // Role Management
+    const handleCreateRole = () => {
+        const newRole: Role = {
+            id: 'r-' + Date.now(),
+            name: 'nowa rola',
+            color: '#94a3b8',
+            permissions: [Permission.SEND_MESSAGES],
+            position: editedServer.roles.length
+        };
+        setEditedServer(prev => ({ ...prev, roles: [...prev.roles, newRole] }));
+        setSelectedRole(newRole);
+    };
+
+    const handleUpdateRole = (roleId: string, updates: Partial<Role>) => {
+        setEditedServer(prev => ({
+            ...prev,
+            roles: prev.roles.map(r => r.id === roleId ? { ...r, ...updates } : r)
+        }));
+        if (selectedRole && selectedRole.id === roleId) {
+            setSelectedRole(prev => prev ? { ...prev, ...updates } : null);
+        }
+    };
+
+    const handleDeleteRole = (roleId: string) => {
+        setEditedServer(prev => ({
+            ...prev,
+            roles: prev.roles.filter(r => r.id !== roleId),
+            // Remove role from members
+            members: prev.members.map(m => ({
+                ...m,
+                roleIds: m.roleIds?.filter(id => id !== roleId)
+            }))
+        }));
+        setSelectedRole(null);
+    };
+
+    const togglePermission = (role: Role, perm: Permission) => {
+        const hasPerm = role.permissions.includes(perm);
+        const newPerms = hasPerm 
+            ? role.permissions.filter(p => p !== perm) 
+            : [...role.permissions, perm];
+        handleUpdateRole(role.id, { permissions: newPerms });
+    };
+
+    // Member Management
+    const toggleMemberRole = (memberId: string, roleId: string) => {
+        setEditedServer(prev => ({
+            ...prev,
+            members: prev.members.map(m => {
+                if (m.id !== memberId) return m;
+                const roles = m.roleIds || [];
+                const hasRole = roles.includes(roleId);
+                return {
+                    ...m,
+                    roleIds: hasRole ? roles.filter(id => id !== roleId) : [...roles, roleId]
+                };
+            })
+        }));
+    };
+
     return (
-        <div className="flex h-full w-full bg-v1">
-            <aside className="w-60 bg-v2 p-6 shrink-0 border-r border-white/5 flex flex-col justify-between">
+        <div className="flex h-full w-full bg-v1 text-white animate-in fade-in duration-200">
+            <aside className="w-60 bg-[#1e1f22] p-3 shrink-0 flex flex-col justify-between border-r border-white/5">
                 <div>
-                     <div className="mb-6 px-4">
-                        <h3 className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1 opacity-60">{server.name}</h3>
+                     <div className="px-3 pt-4 pb-4">
+                        <h3 className="text-slate-400 text-[11px] font-bold uppercase tracking-widest opacity-80 pl-1">{editedServer.name}</h3>
                     </div>
                     <nav className="space-y-0.5">
                         <NavItem icon={<Settings size={18}/>} label="Przegląd" active={activeTab === 'OVERVIEW'} onClick={() => setActiveTab('OVERVIEW')} />
-                        <NavItem icon={<Shield size={18}/>} label="Role" active={activeTab === 'ROLES'} onClick={() => setActiveTab('ROLES')} />
+                        <NavItem icon={<Shield size={18}/>} label="Role" active={activeTab === 'ROLES'} onClick={() => { setActiveTab('ROLES'); setSelectedRole(null); }} />
                         <NavItem icon={<Users size={18}/>} label="Członkowie" active={activeTab === 'MEMBERS'} onClick={() => setActiveTab('MEMBERS')} />
                     </nav>
                 </div>
-                <button onClick={handleDelete} className="flex items-center gap-2 text-rose-500 hover:bg-rose-500/10 p-2 rounded-lg transition-all text-xs font-bold uppercase tracking-wide">
-                    <Trash2 size={16} /> Usuń serwer
-                </button>
+                
+                 <div className="p-2 border-t border-white/5 space-y-2">
+                    <button onClick={handleSaveChanges} className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white hover:bg-emerald-500 p-2 rounded-lg transition-all text-xs font-bold uppercase tracking-wide">
+                        <Check size={16} /> Zapisz zmiany
+                    </button>
+                    <button onClick={handleDeleteServer} className="w-full flex items-center gap-2 text-rose-400 hover:bg-rose-500/10 hover:text-rose-500 p-2 rounded-lg transition-all text-xs font-bold uppercase tracking-wide">
+                        <Trash2 size={16} /> Usuń serwer
+                    </button>
+                </div>
             </aside>
-            <main className="flex-1 p-12 overflow-y-auto relative">
-                <button onClick={onClose} className="fixed top-8 right-8 p-2 text-slate-400 hover:text-white border-2 border-slate-400/20 rounded-full hover:border-white transition-all">
+
+            <main className="flex-1 bg-v1 flex flex-col relative overflow-hidden">
+                <button onClick={onClose} className="absolute top-8 right-8 p-2 text-slate-400 hover:text-white border-2 border-slate-400/20 rounded-full hover:border-white transition-all z-50 group">
                     <X size={24} />
-                    <span className="text-[10px] font-black uppercase tracking-widest absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 hover:opacity-100">ESC</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity bg-black px-2 py-1 rounded text-white pointer-events-none">ESC</span>
                 </button>
                 
-                <div className="max-w-2xl">
-                    <h2 className="text-xl font-bold text-white mb-8">Przegląd serwera</h2>
-                    <div className="flex gap-8">
-                         <div className="shrink-0 flex flex-col items-center gap-2">
-                             <div className="relative group">
-                                <img src={server.icon} className="w-24 h-24 rounded-full object-cover shadow-2xl" />
-                                <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer">
-                                    <span className="text-[10px] font-black uppercase text-white">Zmień</span>
+                <div className="flex-1 overflow-y-auto p-12 custom-scrollbar no-scrollbar">
+                    <div className="max-w-3xl">
+                        {activeTab === 'OVERVIEW' && (
+                            <div className="animate-in slide-in-from-bottom-4 duration-300">
+                                <h2 className="text-2xl font-black text-white mb-8">Przegląd serwera</h2>
+                                <div className="flex flex-col md:flex-row gap-10">
+                                     <div className="shrink-0 flex flex-col items-center gap-4">
+                                         <div className="relative group w-32 h-32">
+                                            <img src={editedServer.icon} className="w-full h-full rounded-full object-cover shadow-2xl ring-4 ring-[#1e1f22]" />
+                                            <div className="absolute top-0 right-0 bg-indigo-500 rounded-full p-2 shadow-lg">
+                                                <ImageIcon size={16} className="text-white" />
+                                            </div>
+                                            <div 
+                                                className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-sm"
+                                                onClick={() => fileInputRef.current?.click()}
+                                            >
+                                                <span className="text-[10px] font-black uppercase text-white tracking-wider">Zmień ikonę</span>
+                                            </div>
+                                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleIconUpload} />
+                                         </div>
+                                     </div>
+
+                                     <div className="flex-1 space-y-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nazwa serwera</label>
+                                            <input 
+                                                value={editedServer.name} 
+                                                onChange={e => setEditedServer(prev => ({...prev, name: e.target.value}))} 
+                                                className="w-full bg-[#1e1f22] p-3 rounded-lg text-white font-medium outline-none focus:border-indigo-500 border border-black/20 transition-all" 
+                                            />
+                                        </div>
+                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'ROLES' && (
+                             <div className="animate-in slide-in-from-bottom-4 duration-300 h-full flex gap-8">
+                                {/* Role List */}
+                                <div className="w-64 shrink-0 flex flex-col gap-2">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h2 className="text-xl font-black text-white">Role</h2>
+                                        <button onClick={handleCreateRole} className="p-1.5 bg-indigo-600 rounded hover:bg-indigo-500 text-white transition-all"><Plus size={16}/></button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {editedServer.roles.map(role => (
+                                            <div 
+                                                key={role.id} 
+                                                onClick={() => setSelectedRole(role)}
+                                                className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${selectedRole?.id === role.id ? 'bg-indigo-600/20 text-white border border-indigo-500/50' : 'text-slate-400 hover:bg-[#1e1f22] hover:text-slate-200'}`}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: role.color }} />
+                                                    <span className="text-xs font-bold truncate">{role.name}</span>
+                                                </div>
+                                                <ChevronRight size={14} className="opacity-50" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Role Editor */}
+                                <div className="flex-1 bg-[#1e1f22] rounded-xl p-6 border border-white/5 overflow-y-auto max-h-[70vh] no-scrollbar">
+                                    {selectedRole ? (
+                                        <div className="space-y-6">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="font-bold text-white uppercase tracking-wider text-xs">Edytuj rolę - {selectedRole.name}</h3>
+                                                <button onClick={() => handleDeleteRole(selectedRole.id)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-lg transition-all"><Trash2 size={16}/></button>
+                                            </div>
+                                            
+                                            <div className="space-y-2">
+                                                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nazwa roli</label>
+                                                <input 
+                                                    value={selectedRole.name} 
+                                                    onChange={e => handleUpdateRole(selectedRole.id, { name: e.target.value })} 
+                                                    className="w-full bg-black/20 p-3 rounded-lg text-white font-medium outline-none focus:border-indigo-500 border border-transparent" 
+                                                />
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kolor roli</label>
+                                                <div className="flex items-center gap-4">
+                                                    <input 
+                                                        type="color" 
+                                                        value={selectedRole.color} 
+                                                        onChange={e => handleUpdateRole(selectedRole.id, { color: e.target.value })} 
+                                                        className="w-16 h-10 bg-transparent cursor-pointer border-none"
+                                                    />
+                                                    <span className="text-sm font-mono text-slate-400 uppercase">{selectedRole.color}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="h-px bg-white/5 my-4" />
+                                            
+                                            <div className="space-y-2">
+                                                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Uprawnienia</label>
+                                                <div className="space-y-2">
+                                                    {PERMISSIONS_LIST.map(perm => (
+                                                        <div key={perm.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 border border-white/5">
+                                                            <div>
+                                                                <div className="text-sm font-bold text-slate-200">{perm.label}</div>
+                                                                <div className="text-[10px] text-slate-500">{perm.description}</div>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => togglePermission(selectedRole, perm.id)}
+                                                                className={`w-10 h-5 rounded-full transition-all relative ${selectedRole.permissions.includes(perm.id) ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                                                            >
+                                                                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${selectedRole.permissions.includes(perm.id) ? 'left-5.5' : 'left-0.5'}`} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50">
+                                            <Shield size={48} className="mb-4" />
+                                            <span className="text-sm font-bold">Wybierz rolę, aby edytować</span>
+                                        </div>
+                                    )}
                                 </div>
                              </div>
-                         </div>
-                         <div className="flex-1 space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nazwa serwera</label>
-                                <input 
-                                    value={name} 
-                                    onChange={e => setName(e.target.value)} 
-                                    className="w-full bg-[#1e1f22] p-3 rounded-lg text-white font-medium outline-none focus:border-indigo-500 border border-transparent transition-all" 
-                                />
-                            </div>
-                            <div className="pt-4 border-t border-white/5">
-                                 <button 
-                                    onClick={() => onSubmit({ ...server, name })}
-                                    className="bg-emerald-600 text-white px-6 py-2 rounded-md font-bold text-sm hover:bg-emerald-500 transition-all shadow-lg"
-                                 >
-                                     Zapisz zmiany
-                                 </button>
-                            </div>
-                         </div>
+                        )}
+
+                        {activeTab === 'MEMBERS' && (
+                             <div className="animate-in slide-in-from-bottom-4 duration-300">
+                                <h2 className="text-2xl font-black text-white mb-6">Członkowie</h2>
+                                <div className="mb-4 relative">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                    <input 
+                                        placeholder="Szukaj użytkowników..."
+                                        className="w-full bg-[#1e1f22] py-2.5 pl-10 pr-4 rounded-lg text-sm text-white placeholder:text-slate-600 outline-none border border-white/5 focus:border-indigo-500/50 transition-all"
+                                    />
+                                </div>
+                                <div className="space-y-1 pb-20">
+                                    {editedServer.members.map(member => (
+                                        <div key={member.id} className="flex items-center justify-between p-3 hover:bg-[#1e1f22] rounded-xl transition-all group border border-transparent hover:border-white/5">
+                                            <div className="flex items-center gap-3">
+                                                <img src={member.avatar} className="w-10 h-10 rounded-full object-cover" />
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-sm text-white">{member.username}</span>
+                                                        {member.isBot && <span className="text-[9px] bg-indigo-500 text-white px-1 rounded uppercase font-bold">BOT</span>}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 mt-1">
+                                                        {member.roleIds?.map(rid => {
+                                                            const r = editedServer.roles.find(role => role.id === rid);
+                                                            if(!r) return null;
+                                                            return (
+                                                                <div key={rid} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/5 border border-white/5">
+                                                                    <div className="w-2 h-2 rounded-full" style={{backgroundColor: r.color}} />
+                                                                    <span className="text-[9px] font-bold text-slate-300">{r.name}</span>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="relative">
+                                                 <button 
+                                                    onClick={() => setEditingMemberId(editingMemberId === member.id ? null : member.id)}
+                                                    className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-indigo-400 transition-all"
+                                                    title="Zarządzaj rolami"
+                                                 >
+                                                     <Plus size={16} />
+                                                 </button>
+                                                 
+                                                 {/* Role Assignment Dropdown */}
+                                                 {editingMemberId === member.id && (
+                                                     <div className="absolute right-0 top-full mt-2 w-48 bg-[#111214] border border-white/10 rounded-xl shadow-2xl z-50 p-2 overflow-hidden animate-in fade-in zoom-in-95">
+                                                         <div className="text-[10px] font-black uppercase text-slate-500 px-2 py-1 mb-1">Przypisz role</div>
+                                                         <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-0.5">
+                                                             {editedServer.roles.map(role => {
+                                                                 const hasRole = member.roleIds?.includes(role.id);
+                                                                 return (
+                                                                    <button 
+                                                                        key={role.id}
+                                                                        onClick={() => toggleMemberRole(member.id, role.id)}
+                                                                        className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-bold transition-all ${hasRole ? 'bg-indigo-600/20 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="w-2 h-2 rounded-full" style={{backgroundColor: role.color}} />
+                                                                            <span className="truncate max-w-[100px]">{role.name}</span>
+                                                                        </div>
+                                                                        {hasRole && <Check size={12} className="text-indigo-400" />}
+                                                                    </button>
+                                                                 )
+                                                             })}
+                                                         </div>
+                                                     </div>
+                                                 )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                             </div>
+                        )}
                     </div>
                 </div>
             </main>
@@ -524,6 +826,11 @@ const ServerSettingsModal = ({ onClose, onSubmit, server }: { onClose: () => voi
 };
 
 const UserSettingsModal = ({ onClose, currentUser, onSubmit }: { onClose: () => void, currentUser: User, onSubmit: (d: any) => void }) => {
+    // ... (rest of UserSettingsModal code)
+    // Assuming unchanged for brevity as per instructions to only return updated files
+    // But since this is a monolithic replacement in XML, I must include the rest of the file content correctly.
+    // Re-inserting the UserSettingsModal and DeviceSettingsModal logic.
+
     const [activeTab, setActiveTab] = useState('ACCOUNT');
     const [theme, setTheme] = useState(currentUser.settings.theme);
 
@@ -552,7 +859,6 @@ const UserSettingsModal = ({ onClose, currentUser, onSubmit }: { onClose: () => 
             aboutMe: pAbout,
             customStatus: pCustomStatus 
         });
-        // Opcjonalnie zamknij modal lub pokaż komunikat sukcesu
         onClose();
     };
 

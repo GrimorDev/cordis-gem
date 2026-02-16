@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles, Bell, Users, Settings, MessageSquare, Search, UserPlus, Phone, Video as VideoIcon } from 'lucide-react';
 import { ServerList } from './components/ServerList';
 import { ChannelList } from './components/ChannelList';
@@ -57,7 +57,6 @@ const App: React.FC = () => {
     if (currentUser.status !== targetStatus) {
       const updatedUser = { ...currentUser, status: targetStatus };
       setCurrentUser(updatedUser);
-      // Synchronizacja statusu w listach serwerów
       setServers(prev => prev.map(s => ({
         ...s,
         members: s.members.map(m => m.id === updatedUser.id ? updatedUser : m)
@@ -95,15 +94,16 @@ const App: React.FC = () => {
     }
   }, [servers, activeServerId, activeChannelId]);
 
-  const activeServer = servers.find(s => s.id === activeServerId);
-  const dmChannels = [
+  const activeServer = useMemo(() => servers.find(s => s.id === activeServerId), [servers, activeServerId]);
+  
+  const dmChannels = useMemo(() => [
     { id: 'dm-gemini', name: 'Gemini AI', avatar: GEMINI_BOT.avatar, status: UserStatus.ONLINE, user: GEMINI_BOT },
     ...friends.map(f => ({ id: `dm-${f.id}`, name: f.username, avatar: f.avatar, status: f.status, user: f }))
-  ];
+  ], [friends]);
 
-  const activeChannelObj = activeServerId === 'DM' 
+  const activeChannelObj = useMemo(() => activeServerId === 'DM' 
     ? { id: activeChannelId, name: dmChannels.find(d => d.id === activeChannelId)?.name || 'Czat', type: ChannelType.TEXT, categoryId: 'dm' }
-    : activeServer?.categories?.flatMap(c => c.channels || [])?.find(c => c.id === activeChannelId);
+    : activeServer?.categories?.flatMap(c => c.channels || [])?.find(c => c.id === activeChannelId), [activeServerId, activeChannelId, dmChannels, activeServer]);
 
   const handleSendMessage = async (content: string, replyToId?: string, attachment?: any) => {
     if (!activeChannelId) return;
@@ -114,22 +114,21 @@ const App: React.FC = () => {
         senderId: currentUser.id, 
         timestamp: new Date(), 
         replyToId,
-        attachment
+        attachment,
+        reactions: {}
     };
     
     setMessagesMap(prev => ({ ...prev, [activeChannelId]: [...(prev[activeChannelId] || []), newMessage] }));
 
-    // AI Logic
     if (activeChannelId.includes('gemini') || (content && content.toLowerCase().includes('gemini')) || (!content && attachment && activeChannelId.includes('gemini'))) {
       setTypingUsers([GEMINI_BOT.username]);
       
-      // Fallback prompt dla bota jeśli wysłano tylko obrazek/gif
       const prompt = content || (attachment ? `[Użytkownik wysłał załącznik typu ${attachment.type}]` : "Hej");
       
       const response = await generateAIResponse(prompt);
       setTimeout(() => {
         setTypingUsers([]);
-        const aiMsg: Message = { id: Date.now().toString(), content: response, senderId: GEMINI_BOT.id, timestamp: new Date(), replyToId: newMessage.id };
+        const aiMsg: Message = { id: Date.now().toString(), content: response, senderId: GEMINI_BOT.id, timestamp: new Date(), replyToId: newMessage.id, reactions: {} };
         setMessagesMap(prev => ({ ...prev, [activeChannelId]: [...(prev[activeChannelId] || []), aiMsg] }));
       }, 1500);
     }
@@ -143,6 +142,41 @@ const App: React.FC = () => {
             msg.id === messageId ? { ...msg, content, isEdited: true } : msg
         )
     }));
+  };
+
+  const handleAddReaction = (messageId: string, emoji: string) => {
+    if (!activeChannelId) return;
+    setMessagesMap(prev => {
+        const channelMessages = prev[activeChannelId] || [];
+        return {
+            ...prev,
+            [activeChannelId]: channelMessages.map(msg => {
+                if (msg.id !== messageId) return msg;
+                
+                const currentReactions = { ...(msg.reactions || {}) };
+                const userExistingReactionEmoji = Object.keys(currentReactions).find(key => 
+                    currentReactions[key]?.includes(currentUser.id)
+                );
+
+                if (userExistingReactionEmoji === emoji) {
+                    currentReactions[emoji] = currentReactions[emoji].filter(id => id !== currentUser.id);
+                    if (currentReactions[emoji].length === 0) {
+                        delete currentReactions[emoji];
+                    }
+                } else {
+                    if (userExistingReactionEmoji) {
+                        currentReactions[userExistingReactionEmoji] = currentReactions[userExistingReactionEmoji].filter(id => id !== currentUser.id);
+                        if (currentReactions[userExistingReactionEmoji].length === 0) {
+                            delete currentReactions[userExistingReactionEmoji];
+                        }
+                    }
+                    currentReactions[emoji] = [...(currentReactions[emoji] || []), currentUser.id];
+                }
+
+                return { ...msg, reactions: currentReactions };
+            })
+        };
+    });
   };
 
   const startCall = async (channelId: string, isVideo: boolean = false) => {
@@ -177,7 +211,6 @@ const App: React.FC = () => {
     } else {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        // Handle stop sharing from browser UI
         stream.getVideoTracks()[0].onended = () => {
           setScreenStream(null);
         };
@@ -226,7 +259,7 @@ const App: React.FC = () => {
       <ServerList servers={servers} activeServerId={activeServerId} onSwitchServer={(id) => { setActiveServerId(id); setActiveChannelId(null); }} onAddServer={() => setModalType('CREATE_SERVER')} />
       
       <div className="flex-1 flex overflow-hidden">
-        <aside className="w-[280px] flex flex-col bg-v1 border-r border-v shrink-0">
+        <aside className="w-[280px] flex flex-col bg-v1 border-r border-v shrink-0 transition-all duration-300">
           <ChannelList 
             activeServer={activeServerId === 'DM' ? undefined : activeServer} 
             activeChannelId={activeChannelId} 
@@ -253,47 +286,58 @@ const App: React.FC = () => {
           />
         </aside>
 
-        <div className="flex-1 flex flex-col min-w-0 bg-v0">
+        <div className="flex-1 flex flex-col min-w-0 bg-v0 relative">
           <header className="h-[64px] border-b border-v flex items-center justify-between px-8 shrink-0 bg-v0/80 backdrop-blur-md z-10">
-            <h1 className="text-lg font-black tracking-tight">{(activeChannelObj as any)?.name || 'Wybierz kanał'}</h1>
+            <h1 className="text-lg font-black tracking-tight animate-fade-in" key={activeChannelId || 'header'}>{(activeChannelObj as any)?.name || 'Wybierz kanał'}</h1>
           </header>
           
           <main className="flex-1 flex overflow-hidden">
             <div className="flex-1 flex flex-col min-w-0">
                 {activeChannelId ? (
                     <ChatArea 
+                        key={activeChannelId} // Important: Key ensures ChatArea resets/transitions on channel switch
                         channel={activeChannelObj as any} messages={messagesMap[activeChannelId] || []}
                         members={activeServer?.members || [currentUser, GEMINI_BOT]}
                         onSendMessage={handleSendMessage} 
-                        onDeleteMessage={(id) => setMessagesMap(prev => ({ ...prev, [activeChannelId]: prev[activeChannelId].filter(m => m.id !== id) }))}
+                        onDeleteMessage={(id) => setMessagesMap(prev => ({ 
+                            ...prev, 
+                            [activeChannelId]: prev[activeChannelId].map(m => 
+                                m.id === id 
+                                ? { ...m, isDeleted: true, content: '[Wiadomość została usunięta]', attachment: undefined, reactions: {} } 
+                                : m
+                            )
+                        }))}
                         onUpdateMessage={handleUpdateMessage}
+                        onAddReaction={handleAddReaction}
                         currentUser={currentUser} typingUsers={typingUsers} activeServer={activeServer}
                     />
-                ) : ( <div className="flex-1 flex items-center justify-center opacity-10"><Sparkles size={100} /></div> )}
+                ) : ( <div className="flex-1 flex items-center justify-center opacity-10 animate-fade-in"><Sparkles size={100} /></div> )}
             </div>
             {activeServerId !== 'DM' && (
-              <aside className="w-[280px] border-l border-v bg-v1 shrink-0 hidden xl:block">
+              <aside className="w-[280px] border-l border-v bg-v1 shrink-0 hidden xl:block animate-fade-in">
                 <UserList members={activeServer?.members || []} server={activeServer} onUserAction={(u, a) => { if(a==='MESSAGE') { setActiveServerId('DM'); setActiveChannelId(`dm-${u.id}`); }}} />
               </aside>
             )}
           </main>
 
           {activeVoiceChannelId && !isVoiceMinimized && (
-            <VideoGrid 
-              currentUser={currentUser}
-              localStream={localStream} 
-              screenStream={screenStream} 
-              isMicMuted={isMicMuted} 
-              isDeafened={isDeafened} 
-              isCameraOn={isCameraOn}
-              onToggleMic={handleToggleMic} 
-              onToggleDeafen={handleToggleDeafen} 
-              onToggleCamera={() => setIsCameraOn(!isCameraOn)}
-              onToggleScreenShare={handleToggleScreenShare} 
-              onDisconnect={stopCall} 
-              onOpenSettings={() => setModalType('DEVICE_SETTINGS')} 
-              onMinimize={() => setIsVoiceMinimized(true)}
-            />
+            <div className="absolute inset-0 z-50">
+              <VideoGrid 
+                currentUser={currentUser}
+                localStream={localStream} 
+                screenStream={screenStream} 
+                isMicMuted={isMicMuted} 
+                isDeafened={isDeafened} 
+                isCameraOn={isCameraOn}
+                onToggleMic={handleToggleMic} 
+                onToggleDeafen={handleToggleDeafen} 
+                onToggleCamera={() => setIsCameraOn(!isCameraOn)}
+                onToggleScreenShare={handleToggleScreenShare} 
+                onDisconnect={stopCall} 
+                onOpenSettings={() => setModalType('DEVICE_SETTINGS')} 
+                onMinimize={() => setIsVoiceMinimized(true)}
+              />
+            </div>
           )}
 
           {activeVoiceChannelId && isVoiceMinimized && (
@@ -317,7 +361,6 @@ const App: React.FC = () => {
         onClose={() => setModalType(null)} 
         onSubmit={(d) => { 
             if (modalType === 'SETTINGS') {
-                // Synchronizacja danych użytkownika we wszystkich miejscach
                 const updatedUser = { ...currentUser, ...d };
                 setCurrentUser(updatedUser);
                 setServers(prev => prev.map(server => ({
@@ -327,39 +370,60 @@ const App: React.FC = () => {
                     )
                 })));
             }
-
-            if (modalType === 'CREATE_SERVER') setServers(prev => [...prev, { ...d, id: 's'+Date.now(), members: [currentUser], ownerId: currentUser.id, roles: DEFAULT_ROLES, categories: [] }]);
+            if (modalType === 'CREATE_SERVER') {
+                if (d.action === 'JOIN') {
+                    const joinedServer: Server = {
+                        id: 's-joined-' + Date.now(),
+                        name: 'Serwer Społeczności (' + d.inviteCode + ')',
+                        icon: 'https://picsum.photos/seed/join/200',
+                        ownerId: 'unknown',
+                        members: [currentUser, GEMINI_BOT],
+                        roles: DEFAULT_ROLES,
+                        categories: [
+                             {
+                                id: 'cj1',
+                                name: 'General',
+                                channels: [{ id: 'ch-j1', name: 'chat', type: ChannelType.TEXT, messages: [], connectedUserIds: [], categoryId: 'cj1' }]
+                             }
+                        ]
+                    };
+                    setServers(prev => [...prev, joinedServer]);
+                } else {
+                     setServers(prev => [...prev, { ...d, id: 's'+Date.now(), members: [currentUser], ownerId: currentUser.id, roles: DEFAULT_ROLES, categories: [] }]);
+                }
+            }
             
-            // Obsługa tworzenia kategorii
             if (modalType === 'CREATE_CATEGORY' && activeServerId !== 'DM') {
                 setServers(prev => prev.map(s => {
                     if (s.id === activeServerId) {
-                        return {
-                            ...s,
-                            categories: [...s.categories, { id: 'c' + Date.now(), name: d.name, channels: [] }]
-                        };
+                        return { ...s, categories: [...s.categories, { id: 'c' + Date.now(), name: d.name, channels: [] }] };
                     }
                     return s;
                 }));
             }
 
-            // Obsługa edycji kategorii
             if (modalType === 'EDIT_CATEGORY' && activeServerId !== 'DM') {
-                setServers(prev => prev.map(s => {
-                    if (s.id === activeServerId) {
-                        if (d._action === 'DELETE') {
+                if (d._action === 'DELETE') {
+                    setServers(prev => prev.map(s => {
+                        if (s.id === activeServerId) {
                             return { ...s, categories: s.categories.filter(c => c.id !== d.id) };
                         }
-                        return {
-                            ...s,
-                            categories: s.categories.map(c => c.id === d.id ? { ...c, name: d.name } : c)
-                        };
+                        return s;
+                    }));
+                    const category = activeServer?.categories.find(c => c.id === d.id);
+                    if (category && category.channels.some(ch => ch.id === activeChannelId)) {
+                        setActiveChannelId(null);
                     }
-                    return s;
-                }));
+                } else {
+                    setServers(prev => prev.map(s => {
+                        if (s.id === activeServerId) {
+                            return { ...s, categories: s.categories.map(c => c.id === d.id ? { ...c, name: d.name } : c) };
+                        }
+                        return s;
+                    }));
+                }
             }
 
-            // Obsługa tworzenia kanału
             if (modalType === 'CREATE_CHANNEL' && activeServerId !== 'DM') {
                 setServers(prev => prev.map(s => {
                     if (s.id === activeServerId) {
@@ -390,43 +454,54 @@ const App: React.FC = () => {
                 }));
             }
 
-            // Obsługa edycji kanału
             if (modalType === 'EDIT_CHANNEL' && activeServerId !== 'DM') {
-                setServers(prev => prev.map(s => {
-                    if (s.id === activeServerId) {
-                        return {
-                            ...s,
-                            categories: s.categories.map(cat => {
-                                if (cat.id === d.categoryId) {
-                                    if (d._action === 'DELETE') {
+                if (d._action === 'DELETE') {
+                    setServers(prev => prev.map(s => {
+                        if (s.id === activeServerId) {
+                            return {
+                                ...s,
+                                categories: s.categories.map(cat => {
+                                    if (cat.id === d.categoryId) {
                                         return { ...cat, channels: cat.channels.filter(ch => ch.id !== d.id) };
                                     }
-                                    return {
-                                        ...cat,
-                                        channels: cat.channels.map(ch => ch.id === d.id ? { ...ch, ...d } : ch)
-                                    };
-                                }
-                                return cat;
-                            })
-                        };
+                                    return cat;
+                                })
+                            };
+                        }
+                        return s;
+                    }));
+                    if (activeChannelId === d.id) {
+                        setActiveChannelId(null);
                     }
-                    return s;
-                }));
-                // Jeśli usunięto aktywny kanał, zresetuj widok
-                if (d._action === 'DELETE' && activeChannelId === d.id) {
-                    setActiveChannelId(null);
+                } else {
+                    setServers(prev => prev.map(s => {
+                        if (s.id === activeServerId) {
+                            return {
+                                ...s,
+                                categories: s.categories.map(cat => {
+                                    if (cat.id === d.categoryId) {
+                                        return {
+                                            ...cat,
+                                            channels: cat.channels.map(ch => ch.id === d.id ? { ...ch, ...d } : ch)
+                                        };
+                                    }
+                                    return cat;
+                                })
+                            };
+                        }
+                        return s;
+                    }));
                 }
             }
-            
-            // Obsługa edycji serwera
+
             if (modalType === 'SERVER_SETTINGS' && activeServerId !== 'DM' && d.id) {
-                 setServers(prev => prev.map(s => s.id === d.id ? d : s));
                  if (d._action === 'DELETE_SERVER') {
                      setServers(prev => prev.filter(s => s.id !== d.id));
                      setActiveServerId('DM');
+                 } else {
+                     setServers(prev => prev.map(s => s.id === d.id ? { ...s, ...d } : s));
                  }
             }
-
             setModalType(null); 
         }} 
         currentUser={currentUser} activeServer={activeServer} targetData={modalData} 

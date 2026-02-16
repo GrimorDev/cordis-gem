@@ -1,11 +1,22 @@
 
-
 import { ChannelType, Server, User, UserStatus, Permission, Role, Language, Theme } from './types';
 
 export const DEFAULT_ROLES: Role[] = [
   { id: 'r-admin', name: 'Admin', color: '#ef4444', permissions: [Permission.ADMINISTRATOR], position: 0 },
   { id: 'r-mod', name: 'Moderator', color: '#6366f1', permissions: [Permission.MANAGE_CHANNELS, Permission.SEND_MESSAGES], position: 1 },
   { id: 'r-everyone', name: 'everyone', color: '#94a3b8', permissions: [Permission.SEND_MESSAGES, Permission.CONNECT, Permission.SPEAK], position: 2 }
+];
+
+export const PERMISSIONS_LIST = [
+  { id: Permission.ADMINISTRATOR, label: 'Administrator', description: 'Udziela wszystkich uprawnień. To niebezpieczne!' },
+  { id: Permission.MANAGE_SERVER, label: 'Zarządzanie serwerem', description: 'Pozwala edytować nazwę i ikonę serwera.' },
+  { id: Permission.MANAGE_ROLES, label: 'Zarządzanie rolami', description: 'Pozwala tworzyć i edytować role.' },
+  { id: Permission.MANAGE_CHANNELS, label: 'Zarządzanie kanałami', description: 'Pozwala tworzyć, edytować i usuwać kanały.' },
+  { id: Permission.KICK_MEMBERS, label: 'Wyrzucanie członków', description: 'Pozwala wyrzucać użytkowników z serwera.' },
+  { id: Permission.BAN_MEMBERS, label: 'Banowanie członków', description: 'Pozwala banować użytkowników na stałe.' },
+  { id: Permission.SEND_MESSAGES, label: 'Wysyłanie wiadomości', description: 'Pozwala pisać na kanałach tekstowych.' },
+  { id: Permission.CONNECT, label: 'Łączenie', description: 'Pozwala dołączać do kanałów głosowych.' },
+  { id: Permission.SPEAK, label: 'Mówienie', description: 'Pozwala rozmawiać na kanałach głosowych.' },
 ];
 
 export const MOCK_USER: User = {

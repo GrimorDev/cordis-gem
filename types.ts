@@ -103,6 +103,7 @@ export interface Message {
     url: string;
     duration?: number; // For audio
   };
+  reactions?: Record<string, string[]>; // emoji -> array of userIds
 }
 
 export interface Channel {
