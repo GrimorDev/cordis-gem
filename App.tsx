@@ -55,7 +55,13 @@ const App: React.FC = () => {
   useEffect(() => {
     const targetStatus = activeVoiceChannelId ? UserStatus.IN_CALL : manualStatus;
     if (currentUser.status !== targetStatus) {
-      setCurrentUser(prev => ({ ...prev, status: targetStatus }));
+      const updatedUser = { ...currentUser, status: targetStatus };
+      setCurrentUser(updatedUser);
+      // Synchronizacja statusu w listach serwerów
+      setServers(prev => prev.map(s => ({
+        ...s,
+        members: s.members.map(m => m.id === updatedUser.id ? updatedUser : m)
+      })));
     }
   }, [activeVoiceChannelId, manualStatus]);
 
@@ -99,14 +105,28 @@ const App: React.FC = () => {
     ? { id: activeChannelId, name: dmChannels.find(d => d.id === activeChannelId)?.name || 'Czat', type: ChannelType.TEXT, categoryId: 'dm' }
     : activeServer?.categories?.flatMap(c => c.channels || [])?.find(c => c.id === activeChannelId);
 
-  const handleSendMessage = async (content: string, replyToId?: string) => {
+  const handleSendMessage = async (content: string, replyToId?: string, attachment?: any) => {
     if (!activeChannelId) return;
-    const newMessage: Message = { id: Math.random().toString(36).substr(2, 9), content, senderId: currentUser.id, timestamp: new Date(), replyToId };
+    
+    const newMessage: Message = { 
+        id: Math.random().toString(36).substr(2, 9), 
+        content, 
+        senderId: currentUser.id, 
+        timestamp: new Date(), 
+        replyToId,
+        attachment
+    };
+    
     setMessagesMap(prev => ({ ...prev, [activeChannelId]: [...(prev[activeChannelId] || []), newMessage] }));
 
-    if (activeChannelId.includes('gemini') || content.toLowerCase().includes('gemini')) {
+    // AI Logic
+    if (activeChannelId.includes('gemini') || (content && content.toLowerCase().includes('gemini')) || (!content && attachment && activeChannelId.includes('gemini'))) {
       setTypingUsers([GEMINI_BOT.username]);
-      const response = await generateAIResponse(content);
+      
+      // Fallback prompt dla bota jeśli wysłano tylko obrazek/gif
+      const prompt = content || (attachment ? `[Użytkownik wysłał załącznik typu ${attachment.type}]` : "Hej");
+      
+      const response = await generateAIResponse(prompt);
       setTimeout(() => {
         setTypingUsers([]);
         const aiMsg: Message = { id: Date.now().toString(), content: response, senderId: GEMINI_BOT.id, timestamp: new Date(), replyToId: newMessage.id };
@@ -260,6 +280,7 @@ const App: React.FC = () => {
 
           {activeVoiceChannelId && !isVoiceMinimized && (
             <VideoGrid 
+              currentUser={currentUser}
               localStream={localStream} 
               screenStream={screenStream} 
               isMicMuted={isMicMuted} 
@@ -295,7 +316,18 @@ const App: React.FC = () => {
         type={modalType} 
         onClose={() => setModalType(null)} 
         onSubmit={(d) => { 
-            if (modalType === 'SETTINGS') setCurrentUser(prev => ({ ...prev, ...d })); 
+            if (modalType === 'SETTINGS') {
+                // Synchronizacja danych użytkownika we wszystkich miejscach
+                const updatedUser = { ...currentUser, ...d };
+                setCurrentUser(updatedUser);
+                setServers(prev => prev.map(server => ({
+                    ...server,
+                    members: server.members.map(member => 
+                        member.id === currentUser.id ? { ...member, ...d } : member
+                    )
+                })));
+            }
+
             if (modalType === 'CREATE_SERVER') setServers(prev => [...prev, { ...d, id: 's'+Date.now(), members: [currentUser], ownerId: currentUser.id, roles: DEFAULT_ROLES, categories: [] }]);
             
             // Obsługa tworzenia kategorii

@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, User, Monitor, MonitorOff, PhoneOff, Video, VideoOff, Headphones, HeadphoneOff, Volume2, Volume1, VolumeX, Settings, ChevronDown, Maximize2, Minimize2, X } from 'lucide-react';
+import { Mic, MicOff, User as UserIcon, Monitor, MonitorOff, PhoneOff, Video, VideoOff, Headphones, HeadphoneOff, Volume2, Volume1, VolumeX, Settings, ChevronDown, Maximize2, Minimize2, X } from 'lucide-react';
+import { User } from '../types';
 
 interface VideoGridProps {
     localStream: MediaStream | null;
@@ -15,6 +16,7 @@ interface VideoGridProps {
     onDisconnect: () => void;
     onOpenSettings: () => void;
     onMinimize?: () => void;
+    currentUser: User;
 }
 
 // Hook to detect audio levels from a MediaStream
@@ -75,7 +77,8 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
     onToggleScreenShare,
     onDisconnect,
     onOpenSettings,
-    onMinimize
+    onMinimize,
+    currentUser
 }) => {
     const localVideoRef = useRef<HTMLVideoElement>(null);
     const screenVideoRef = useRef<HTMLVideoElement>(null);
@@ -191,7 +194,7 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
                                      ? 'border-emerald-500 ring-4 ring-emerald-500/20 scale-105' 
                                      : 'border-white/10'
                                  }`}>
-                                     <img src="https://picsum.photos/200" alt="Avatar" className="w-full h-full rounded-full opacity-80 object-cover" />
+                                     <img src={currentUser.avatar} alt="Avatar" className="w-full h-full rounded-full opacity-100 object-cover" />
                                  </div>
                              </div>
                         )}

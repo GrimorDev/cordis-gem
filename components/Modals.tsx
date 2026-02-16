@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   X, Shield, Users, Plus, Check, ChevronRight, 
   Ban, UserMinus, Settings, Bell, Upload, Video, VideoOff,
-  Lock, Palette, Monitor, LogOut, Trash2, Volume2, Globe, Hash, Layers, Sliders, Trash, ChevronLeft, AlertCircle, Play, Music, UserPlus, Sparkles, Layout, Link as LinkIcon, Search, ArrowUpDown
+  Lock, Palette, Monitor, LogOut, Trash2, Volume2, Globe, Hash, Layers, Sliders, Trash, ChevronLeft, AlertCircle, Play, Music, UserPlus, Sparkles, Layout, Link as LinkIcon, Search, ArrowUpDown, UserPen, Image as ImageIcon
 } from 'lucide-react';
 import { ModalType, ChannelType, User, Server, Theme, Channel, Role, Permission } from '../types';
+import { fileToBase64 } from '../utils/helpers';
 
 interface ModalProps {
     isOpen: boolean;
@@ -526,8 +527,37 @@ const UserSettingsModal = ({ onClose, currentUser, onSubmit }: { onClose: () => 
     const [activeTab, setActiveTab] = useState('ACCOUNT');
     const [theme, setTheme] = useState(currentUser.settings.theme);
 
+    // Profile Edit State
+    const [pUsername, setPUsername] = useState(currentUser.username);
+    const [pAvatar, setPAvatar] = useState(currentUser.avatar || '');
+    const [pBanner, setPBanner] = useState(currentUser.bannerColor || '#1a1818');
+    const [pAbout, setPAbout] = useState(currentUser.aboutMe || '');
+    const [pCustomStatus, setPCustomStatus] = useState(currentUser.customStatus || '');
+
+    const avatarInputRef = useRef<HTMLInputElement>(null);
+
+    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const base64 = await fileToBase64(file);
+            setPAvatar(base64);
+        }
+    };
+
+    const handleSaveProfile = () => {
+        onSubmit({ 
+            username: pUsername, 
+            avatar: pAvatar, 
+            bannerColor: pBanner, 
+            aboutMe: pAbout,
+            customStatus: pCustomStatus 
+        });
+        // Opcjonalnie zamknij modal lub pokaż komunikat sukcesu
+        onClose();
+    };
+
     return (
-        <div className="flex h-full w-full bg-v1">
+        <div className="flex h-full w-full bg-v1 text-white">
              <aside className="w-60 bg-v2 p-6 shrink-0 border-r border-white/5 flex flex-col justify-between">
                 <div>
                      <div className="mb-6 px-4">
@@ -535,6 +565,7 @@ const UserSettingsModal = ({ onClose, currentUser, onSubmit }: { onClose: () => 
                     </div>
                     <nav className="space-y-0.5">
                         <NavItem icon={<Settings size={18}/>} label="Moje konto" active={activeTab === 'ACCOUNT'} onClick={() => setActiveTab('ACCOUNT')} />
+                        <NavItem icon={<UserPen size={18}/>} label="Profile" active={activeTab === 'PROFILE'} onClick={() => setActiveTab('PROFILE')} />
                         <NavItem icon={<Palette size={18}/>} label="Wygląd" active={activeTab === 'APPEARANCE'} onClick={() => setActiveTab('APPEARANCE')} />
                         <NavItem icon={<Volume2 size={18}/>} label="Głos i wideo" active={activeTab === 'VOICE'} onClick={() => setActiveTab('VOICE')} />
                     </nav>
@@ -543,33 +574,128 @@ const UserSettingsModal = ({ onClose, currentUser, onSubmit }: { onClose: () => 
                     <LogOut size={16} /> Wyloguj
                 </button>
             </aside>
-            <main className="flex-1 p-12 overflow-y-auto relative">
-                 <button onClick={onClose} className="fixed top-8 right-8 p-2 text-slate-400 hover:text-white border-2 border-slate-400/20 rounded-full hover:border-white transition-all">
+            <main className="flex-1 p-12 overflow-y-auto relative no-scrollbar">
+                 <button onClick={onClose} className="fixed top-8 right-8 p-2 text-slate-400 hover:text-white border-2 border-slate-400/20 rounded-full hover:border-white transition-all z-50">
                     <X size={24} />
                 </button>
 
-                <div className="max-w-2xl animate-in slide-in-from-bottom-5">
+                <div className="max-w-3xl animate-in slide-in-from-bottom-5">
                     {activeTab === 'ACCOUNT' && (
                         <>
                              <h2 className="text-xl font-bold text-white mb-6">Moje konto</h2>
-                             <div className="bg-[#1e1f22] rounded-xl p-4 border border-white/5 mb-8">
-                                 <div className="flex items-center justify-between">
-                                     <div className="flex items-center gap-4">
-                                         <div className="relative group cursor-pointer">
-                                             <img src={currentUser.avatar} className="w-20 h-20 rounded-full border-4 border-[#1e1f22] shadow-xl" />
-                                             <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                                                <span className="text-[10px] font-black uppercase text-white">Edytuj</span>
-                                             </div>
+                             <div className="bg-[#1e1f22] rounded-xl overflow-hidden border border-white/5 mb-8">
+                                 <div className="h-24" style={{ backgroundColor: pBanner }}></div>
+                                 <div className="px-4 pb-4">
+                                     <div className="flex justify-between items-end -mt-10 mb-4">
+                                         <div className="relative">
+                                             <img src={currentUser.avatar} className="w-24 h-24 rounded-full border-[6px] border-[#1e1f22] bg-[#1e1f22] object-cover" />
+                                             <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-emerald-500 border-4 border-[#1e1f22]" />
                                          </div>
-                                         <div>
-                                             <h3 className="text-lg font-black text-white">{currentUser.username}</h3>
-                                             <span className="text-slate-400 text-sm">#{currentUser.discriminator}</span>
+                                         <button onClick={() => setActiveTab('PROFILE')} className="bg-indigo-600 px-4 py-2 rounded-md text-white text-xs font-bold hover:bg-indigo-500 transition-all mb-2">Edytuj profil</button>
+                                     </div>
+                                     <div className="bg-black/20 p-4 rounded-lg">
+                                         <div className="flex justify-between items-center mb-2">
+                                             <span className="text-xs font-bold text-slate-400 uppercase">Nazwa użytkownika</span>
+                                             <span className="text-sm font-medium text-white">{currentUser.username} <span className="text-slate-500">#{currentUser.discriminator}</span></span>
+                                         </div>
+                                         <div className="flex justify-between items-center mb-2">
+                                             <span className="text-xs font-bold text-slate-400 uppercase">Email</span>
+                                             <span className="text-sm font-medium text-white">{currentUser.settings.email || '*****@gmail.com'} <span className="text-indigo-400 text-xs ml-2 cursor-pointer hover:underline">Odkryj</span></span>
+                                         </div>
+                                         <div className="flex justify-between items-center">
+                                             <span className="text-xs font-bold text-slate-400 uppercase">Telefon</span>
+                                             <span className="text-sm font-medium text-white">{currentUser.settings.phone || '*******89'} <span className="text-indigo-400 text-xs ml-2 cursor-pointer hover:underline">Odkryj</span></span>
                                          </div>
                                      </div>
-                                     <button className="bg-indigo-600 px-4 py-2 rounded-md text-white text-xs font-bold hover:bg-indigo-500 transition-all">Edytuj profil</button>
                                  </div>
                              </div>
                         </>
+                    )}
+
+                    {activeTab === 'PROFILE' && (
+                        <div className="flex flex-col lg:flex-row gap-12">
+                             <div className="flex-1 space-y-6">
+                                <h2 className="text-xl font-bold text-white mb-2">Profil użytkownika</h2>
+                                
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nazwa wyświetlana</label>
+                                    <input 
+                                        value={pUsername} 
+                                        onChange={e => setPUsername(e.target.value)}
+                                        className="w-full bg-[#1e1f22] p-3 rounded-lg text-white font-medium outline-none border border-white/5 focus:border-indigo-500 transition-all" 
+                                    />
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    <div className="flex justify-between">
+                                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Awatar</label>
+                                        <button onClick={() => avatarInputRef.current?.click()} className="text-[11px] font-bold text-indigo-400 hover:underline">Zmień awatar</button>
+                                        <input type="file" ref={avatarInputRef} onChange={handleAvatarUpload} className="hidden" accept="image/*" />
+                                    </div>
+                                    <div className="flex gap-4 items-center">
+                                        <img src={pAvatar || currentUser.avatar} className="w-16 h-16 rounded-full object-cover border border-white/10" />
+                                        <button onClick={() => setPAvatar('')} className="text-xs text-rose-400 hover:underline">Usuń awatar</button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kolor banera</label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-16 h-8 rounded border border-white/10" style={{ backgroundColor: pBanner }} />
+                                        <input 
+                                            type="color" 
+                                            value={pBanner} 
+                                            onChange={e => setPBanner(e.target.value)}
+                                            className="bg-transparent border-none w-8 h-8 cursor-pointer" 
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">O mnie</label>
+                                    <textarea 
+                                        value={pAbout} 
+                                        onChange={e => setPAbout(e.target.value)}
+                                        className="w-full bg-[#1e1f22] p-3 rounded-lg text-white font-medium outline-none border border-white/5 focus:border-indigo-500 transition-all min-h-[100px] resize-none text-sm" 
+                                        placeholder="Napisz coś o sobie..."
+                                    />
+                                </div>
+
+                                <div className="pt-4 border-t border-white/5 flex justify-end">
+                                     <button 
+                                        onClick={handleSaveProfile}
+                                        className="bg-emerald-600 text-white px-8 py-2 rounded-md font-bold text-sm hover:bg-emerald-500 transition-all shadow-lg"
+                                     >
+                                         Zapisz zmiany
+                                     </button>
+                                </div>
+                             </div>
+                             
+                             {/* Preview */}
+                             <div className="w-[300px] shrink-0">
+                                <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-4">Podgląd</h3>
+                                <div className="bg-[#111214] rounded-xl overflow-hidden shadow-2xl border border-white/5 select-none pointer-events-none transform scale-100">
+                                     <div className="h-24 w-full" style={{ backgroundColor: pBanner }} />
+                                     <div className="px-4 pb-4 relative">
+                                         <div className="absolute -top-10 left-4">
+                                             <img src={pAvatar || currentUser.avatar} className="w-20 h-20 rounded-full border-[6px] border-[#111214] bg-[#111214] object-cover" />
+                                             <div className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-4 border-[#111214]" />
+                                         </div>
+                                         <div className="mt-12 bg-[#1e1f22] rounded-lg p-3 border border-white/5">
+                                             <h3 className="font-bold text-white text-lg">{pUsername || currentUser.username}</h3>
+                                             <p className="text-xs text-slate-400 mb-2">#{currentUser.discriminator}</p>
+                                             
+                                             <div className="h-px bg-white/5 my-2" />
+                                             
+                                             <div className="mb-2">
+                                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">O MNIE</span>
+                                                 <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{pAbout || "Użytkownik Cordis."}</p>
+                                             </div>
+                                         </div>
+                                     </div>
+                                </div>
+                             </div>
+                        </div>
                     )}
 
                     {activeTab === 'APPEARANCE' && (

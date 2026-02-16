@@ -1,4 +1,5 @@
 
+
 import { ChannelType, Server, User, UserStatus, Permission, Role, Language, Theme } from './types';
 
 export const DEFAULT_ROLES: Role[] = [
@@ -13,6 +14,8 @@ export const MOCK_USER: User = {
   discriminator: '0001',
   status: UserStatus.ONLINE,
   avatar: 'https://picsum.photos/200',
+  bannerColor: '#6366f1',
+  aboutMe: 'Tworzę fajne rzeczy w React. Witaj w Cordis!',
   roleIds: ['r-admin'],
   joinedAt: '2025-01-17T12:00:00Z',
   settings: {
@@ -34,6 +37,8 @@ export const GEMINI_BOT: User = {
   status: UserStatus.ONLINE,
   isBot: true,
   avatar: 'https://picsum.photos/201',
+  bannerColor: '#1e1b4b',
+  aboutMe: 'Jestem zaawansowanym asystentem AI. Zapytaj mnie o cokolwiek!',
   roleIds: ['r-mod'],
   joinedAt: '2025-01-18T09:00:00Z',
   settings: {

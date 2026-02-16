@@ -1,5 +1,4 @@
 
-
 export enum ChannelType {
   TEXT = 'TEXT',
   VOICE = 'VOICE'
@@ -82,6 +81,8 @@ export interface User {
   discriminator: string;
   status: UserStatus;
   customStatus?: string;
+  aboutMe?: string;
+  bannerColor?: string;
   isBot?: boolean;
   roleIds?: string[];
   settings: UserSettings;

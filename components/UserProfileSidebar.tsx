@@ -36,7 +36,10 @@ export const UserProfileSidebar: React.FC<UserProfileSidebarProps> = ({ user, on
       
       {/* Banner Area */}
       <div className="relative shrink-0">
-        <div className={`h-28 w-full ${user.isBot ? 'bg-indigo-700' : 'bg-[#1a1818]'}`} />
+        <div 
+          className="h-28 w-full transition-colors duration-300"
+          style={{ backgroundColor: user.bannerColor || (user.isBot ? '#4338ca' : '#1a1818') }}
+        />
         <div className="absolute -bottom-10 left-4 p-1 bg-v1 rounded-full shadow-2xl">
           <div className="relative">
             <img src={user.avatar} className="w-20 h-20 rounded-full object-cover border-4 border-v1" alt={user.username} />
@@ -88,10 +91,12 @@ export const UserProfileSidebar: React.FC<UserProfileSidebarProps> = ({ user, on
             <div className="space-y-4">
                 <div>
                     <div className="text-[10px] text-v-muted mb-1.5 font-black uppercase tracking-widest opacity-60">O mnie</div>
-                    <p className="text-sm text-slate-300 leading-relaxed">
-                        {user.isBot 
-                          ? "Jestem Twoim osobistym asystentem AI Cordis. Potrafię analizować pliki, generować odpowiedzi i pomagać Ci w codziennych zadaniach na serwerze."
-                          : "Użytkownik Cordis. Brak opisu profilu."}
+                    <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                        {user.aboutMe 
+                          ? user.aboutMe 
+                          : user.isBot 
+                              ? "Jestem Twoim osobistym asystentem AI Cordis. Potrafię analizować pliki, generować odpowiedzi i pomagać Ci w codziennych zadaniach na serwerze."
+                              : "Użytkownik Cordis. Brak opisu profilu."}
                     </p>
                 </div>
 
